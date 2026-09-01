@@ -1,0 +1,107 @@
+/* STREAMING_CHUNK: Base y utilidades */
+:root {
+--font-sans: 'Inter', sans-serif;
+}
+
+body {
+font-family: var(--font-sans);
+background-color: #f8fafc;
+color: #334155;
+-webkit-font-smoothing: antialiased;
+}
+
+/* STREAMING_CHUNK: Animaciones globales */
+@keyframes fadeIn {
+from { opacity: 0; }
+to { opacity: 1; }
+}
+
+@keyframes slideUp {
+from { opacity: 0; transform: translateY(20px); }
+to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes pulseSoft {
+0%, 100% { opacity: 1; transform: scale(1); }
+50% { opacity: 0.8; transform: scale(0.98); }
+}
+
+.fade-in {
+animation: fadeIn 0.4s ease-out forwards;
+}
+
+.slide-up {
+animation: slideUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
+/* STREAMING_CHUNK: Componentes UI personalizados */
+.loader {
+border-radius: 50%;
+border-right-color: transparent;
+animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+100% { transform: rotate(360deg); }
+}
+
+/* Scrollbar invisible pero funcional para los carruseles */
+.hide-scrollbar::-webkit-scrollbar { display: none; }
+.hide-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+
+/* STREAMING_CHUNK: Estilos del Toggle Switch (Transversales) */
+.toggle-checkbox:checked {
+right: 0;
+border-color: #22c55e;
+}
+
+.toggle-checkbox:checked + .toggle-label {
+background-color: #22c55e;
+}
+
+.toggle-checkbox {
+right: 0;
+z-index: 1;
+border-color: #e2e8f0;
+transition: all 0.3s;
+}
+
+.toggle-label {
+width: 3rem;
+background-color: #e2e8f0;
+transition: all 0.3s;
+}
+
+/* STREAMING_CHUNK: Menús colapsables (Tablas AAP, PEAS, Quejas) */
+.collapsible {
+max-height: 0;
+overflow: hidden;
+transition: max-height 0.4s ease-out, padding 0.4s ease, opacity 0.3s ease;
+opacity: 0;
+}
+
+.collapsible.open {
+max-height: 1000px;
+opacity: 1;
+margin-top: 0.5rem;
+}
+
+/* STREAMING_CHUNK: Previsualización de la Hoja PDF */
+.paper-preview {
+background: white;
+min-height: 297mm;
+width: 210mm;
+margin: 0 auto;
+box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.1), 0 8px 10px -6px rgba(0, 0, 0, 0.1);
+padding: 20mm;
+position: relative;
+}
+
+/* Hacer que el PDF se vea bien en móviles antes de exportar */
+@media (max-width: 768px) {
+.paper-preview {
+width: 100%;
+min-height: auto;
+padding: 10mm;
+}
+}

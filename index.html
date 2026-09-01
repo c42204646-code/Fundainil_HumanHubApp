@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>HumanHub by FUNDAINIL - ERP & M&E</title>
+    
+    <!-- Librerías Externas -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+    
+    <!-- Configuración Tailwind (Debe ir antes de tu CSS) -->
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: { sans: ['Inter', 'sans-serif'] },
+                    colors: {
+                        brand: { 50: '#f0f4f8', 100: '#d9e2ec', 200: '#bcccdc', 300: '#9fb3c8', 400: '#829ab1', 500: '#627d98', 600: '#486581', 700: '#003366', 800: '#002855', 900: '#001a33' },
+                        secondary: { 50: '#f0fdf4', 100: '#dcfce7', 500: '#22c55e', 600: '#16a34a', 900: '#14532d' }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <!-- Conexión a tu archivo CSS Modularizado -->
+    <link rel="stylesheet" href="./css/styles.css">
+</head>
+<body class="flex flex-col min-h-screen">
+
+    <!-- BARRA DE NAVEGACIÓN -->
+    <nav class="bg-white border-b border-slate-200 shadow-sm sticky top-0 z-50">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between h-16">
+                <div class="flex items-center gap-3">
+                    <img src="https://static.wixstatic.com/media/8aebba_9455cbe95cfb4aa183dde97c176546f2~mv2.png/v1/fill/w_263,h_75,al_c,q_85,usm_0.66_1.00_0.01,enc_avif,quality_auto/8aebba_9455cbe95cfb4aa183dde97c176546f2~mv2.png" alt="Logo FUNDAINIL" class="h-10 w-auto object-contain">
+                    <div class="flex flex-col justify-center border-l-2 border-slate-200 pl-3">
+                        <h1 class="text-xl font-black text-brand-900 leading-none tracking-tight">HumanHub</h1>
+                        <span class="text-[9px] uppercase font-bold text-slate-500 tracking-widest mt-0.5">ERP & M&E Dashboard</span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center gap-2 sm:gap-4">
+                    <button onclick="window.humanHubApp.cambiarPista('selector')" id="btn-tab-formulario" class="px-4 py-2 rounded-lg text-sm font-semibold bg-white shadow-sm text-brand-600 transition hover:bg-slate-50 focus:outline-none"><i class="fa-solid fa-pen-to-square mr-1.5"></i> <span class="hidden sm:inline">Nuevo Reporte</span></button>
+                    <button onclick="window.humanHubApp.cambiarPista('dashboard')" id="btn-tab-dashboard" class="px-4 py-2 rounded-lg text-sm font-semibold text-slate-500 hover:bg-slate-100 transition hidden focus:outline-none"><i class="fa-solid fa-chart-pie mr-1.5"></i> <span class="hidden sm:inline" id="txt-btn-dash">Centro de Mando</span></button>
+                    <div class="h-6 w-px bg-slate-300 mx-1 hidden sm:block"></div>
+                    <button onclick="window.humanHubApp.abrirModalLogin()" id="btn-rol" class="flex items-center gap-2 px-3 py-1.5 border border-brand-200 bg-brand-50 rounded-full transition-all hover:bg-brand-100 focus:outline-none">
+                        <div id="rol-icono-bg" class="w-6 h-6 rounded-full bg-brand-500 text-white flex items-center justify-center text-xs shadow-sm"><i class="fa-solid fa-user"></i></div>
+                        <span id="texto-rol" class="text-xs font-bold text-brand-700 uppercase tracking-wide hidden sm:block">Modo: Campo</span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </nav>
+
+    <!-- CARGADOR INICIAL -->
+    <div id="cargador-inicial" class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center fade-in">
+        <div class="loader w-12 h-12 mb-4 border-t-brand-700 border-4"></div>
+        <p class="text-brand-700 font-bold animate-pulse">Sincronizando con Servidores FUNDAINIL...</p>
+    </div>
+
+    <!-- CONTENEDOR PRINCIPAL -->
+    <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+        
+        <!-- VISTA 1: SELECTOR -->
+        <section id="vista-selector" class="hidden slide-up">
+            <div class="text-center mb-12">
+                <h2 class="text-3xl md:text-4xl font-extrabold text-slate-900 tracking-tight mb-3">¿Qué actividad vamos a reportar hoy?</h2>
+                <p class="text-slate-500 text-lg max-w-2xl mx-auto">Selecciona el área de intervención.</p>
+            </div>
+            <div id="grid-sectores" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-5xl mx-auto"></div>
+        </section>
+
+        <!-- VISTA 2: FORMULARIO -->
+        <section id="vista-formulario" class="hidden slide-up">
+            <div class="mb-6"><button type="button" onclick="window.humanHubApp.cambiarPista('selector')" class="text-slate-500 hover:text-brand-600 font-semibold text-sm transition flex items-center group"><div class="w-8 h-8 rounded-full bg-white shadow-sm border border-slate-200 flex items-center justify-center mr-3 group-hover:bg-brand-50 transition-colors"><i class="fa-solid fa-arrow-left"></i></div>Volver al selector</button></div>
+
+            <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden max-w-5xl mx-auto">
+                <div class="bg-slate-50/50 border-b border-slate-200 px-6 py-5 flex justify-between items-center">
+                    <div><h2 class="text-2xl font-bold text-slate-800 flex items-center"><i class="fa-solid fa-clipboard-list text-brand-600 mr-3"></i>Registro de Actividad</h2></div>
+                    <div class="bg-brand-50 text-brand-800 px-4 py-2.5 rounded-xl border border-brand-100 shadow-sm flex items-center gap-3">
+                        <div class="w-8 h-8 bg-white rounded-lg flex items-center justify-center"><i id="icono-sector-actual" class="fa-solid fa-tag text-brand-600"></i></div>
+                        <div><span class="text-[10px] uppercase font-bold text-brand-600 block leading-tight">Sector Actual</span><span id="lbl-sector-actual" class="font-black text-lg leading-none">Sector</span></div><input type="hidden" id="in-sector-id"><input type="hidden" id="in-sector-nombre">
+                    </div>
+                </div>
+                
+                <form id="form-reporte" class="p-6 sm:p-8 space-y-10">
+                    <!-- 1. Información General -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div class="space-y-5">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2">1. Información General</h3>
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Profesionales Responsables *</label><div class="relative"><i class="fa-solid fa-users absolute left-3.5 top-3 text-slate-400"></i><input type="text" id="in-profesional" required class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none" placeholder="Nombres separados por coma"></div></div>
+                            <div>
+                                <label class="block text-sm font-semibold text-slate-700 mb-1.5">Periodo de Reporte (M&E) *</label>
+                                <select id="in-periodo" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-500">
+                                    <option value="Quincena 1">Quincenal 1 (Días 1-15)</option>
+                                    <option value="Quincena 2">Quincenal 2 (Días 16-30)</option>
+                                    <option value="Mensual">Mensual Consolidado</option>
+                                </select>
+                            </div>
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Actividad *</label><select id="in-actividad" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></select></div>
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Tema Específico *</label><select id="in-tema" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500"></select></div>
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Fecha *</label><input type="date" id="in-fecha" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-slate-700 focus:ring-2 focus:ring-brand-500"></div>
+                        </div>
+
+                        <!-- 2. Localización -->
+                        <div class="space-y-5">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 flex justify-between items-center">2. Localización <button type="button" onclick="window.humanHubApp.capturarUbicacion(this)" class="text-xs bg-brand-100 text-brand-700 hover:bg-brand-200 px-3 py-1 rounded-full font-bold transition flex items-center"><i class="fa-solid fa-location-crosshairs mr-1"></i> Usar GPS</button></h3>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Estado *</label><select id="in-estado" required onchange="window.humanHubApp.actualizarMunicipios()" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-500"><option value="">Seleccione...</option><option value="Distrito Capital">Distrito Capital</option><option value="Miranda">Miranda</option><option value="La Guaira">La Guaira</option></select></div>
+                                <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Municipio *</label><select id="in-municipio" required onchange="window.humanHubApp.actualizarParroquias()" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm disabled:opacity-50" disabled><option value="">Seleccione</option></select></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Parroquia *</label><select id="in-parroquia" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm disabled:opacity-50" disabled><option value="">Seleccione</option></select></div>
+                                <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Establecimiento / Comunidad *</label><input type="text" id="in-comunidad" required placeholder="Ej. La Dolorita" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm focus:ring-2 focus:ring-brand-500"></div>
+                            </div>
+                            <div class="grid grid-cols-2 gap-4">
+                                <div><label class="block text-xs font-semibold text-slate-500 mb-1">Latitud</label><input type="text" id="in-lat" readonly class="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 outline-none"></div>
+                                <div><label class="block text-xs font-semibold text-slate-500 mb-1">Longitud</label><input type="text" id="in-lng" readonly class="w-full px-3 py-1.5 bg-slate-100 border border-slate-200 rounded-lg text-sm text-slate-500 outline-none"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 3. Áreas Transversales y Vulnerabilidades -->
+                    <div class="bg-slate-50 p-6 rounded-2xl border border-slate-200 space-y-6">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-500 border-b border-slate-200 pb-2"><i class="fa-solid fa-layer-group mr-2"></i>3. Áreas Transversales (AAP, PEAS, GEN) y Vulnerabilidades</h3>
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                            
+                            <!-- Transversales -->
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 mb-3 uppercase">Enfoques Integrados a la Actividad</p>
+                                <div class="space-y-4">
+                                    
+                                    <!-- GÉNERO (GEN) -->
+                                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div class="flex items-center justify-between p-3 border-b border-slate-100">
+                                            <div><p class="text-sm font-bold text-slate-700">Enfoque de Género (GEN)</p><p class="text-[10px] text-slate-500">¿Análisis o Sensibilización Institucional?</p></div>
+                                            <div class="relative inline-block w-12 mr-2 align-middle select-none">
+                                                <input type="checkbox" id="tgg-gen" onchange="window.humanHubApp.toggleTransversal('gen')" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 z-10"/>
+                                                <label for="tgg-gen" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
+                                            </div>
+                                        </div>
+                                        <div id="panel-gen" class="collapsible bg-slate-50">
+                                            <p class="text-xs text-slate-600 mb-2 font-semibold border-b border-slate-200 pb-1 px-3">Desglose de Personas Sensibilizadas (GEN):</p>
+                                            <div class="grid grid-cols-4 gap-2 text-center text-xs px-3 pb-3">
+                                                <div><label class="block font-bold text-pink-600 mb-1">Niñas</label><input type="number" id="gen-ninas" min="0" value="0" class="w-full px-2 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300"></div>
+                                                <div><label class="block font-bold text-blue-600 mb-1">Niños</label><input type="number" id="gen-ninos" min="0" value="0" class="w-full px-2 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300"></div>
+                                                <div><label class="block font-bold text-pink-700 mb-1">Mujeres</label><input type="number" id="gen-mujeres" min="0" value="0" class="w-full px-2 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300"></div>
+                                                <div><label class="block font-bold text-blue-700 mb-1">Hombres</label><input type="number" id="gen-hombres" min="0" value="0" class="w-full px-2 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300"></div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- RENDICIÓN DE CUENTAS (AAP) -->
+                                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div class="flex items-center justify-between p-3 border-b border-slate-100">
+                                            <div><p class="text-sm font-bold text-slate-700">Rendición de Cuentas (AAP)</p><p class="text-[10px] text-slate-500">¿Información o Toma de Decisiones?</p></div>
+                                            <div class="relative inline-block w-12 mr-2 align-middle select-none">
+                                                <input type="checkbox" id="tgg-aap" onchange="window.humanHubApp.toggleTransversal('aap')" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 z-10"/>
+                                                <label for="tgg-aap" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
+                                            </div>
+                                        </div>
+                                        <div id="panel-aap" class="collapsible bg-slate-50 px-3 pb-3">
+                                             <div class="mb-3 mt-2">
+                                                <p class="text-xs text-slate-600 mb-2 font-semibold border-b border-slate-200 pb-1">1. Personas alcanzadas con Información (AAP1):</p>
+                                                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                                    <input type="number" id="aap1-ninas" min="0" value="0" placeholder="Niñas" title="Niñas" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap1-ninos" min="0" value="0" placeholder="Niños" title="Niños" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap1-mujeres" min="0" value="0" placeholder="Mujeres" title="Mujeres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap1-hombres" min="0" value="0" placeholder="Hombres" title="Hombres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                </div>
+                                             </div>
+                                             <div>
+                                                <p class="text-xs text-slate-600 mb-2 font-semibold border-b border-slate-200 pb-1">2. Personas participando en decisiones (AAP2):</p>
+                                                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                                    <input type="number" id="aap2-ninas" min="0" value="0" title="Niñas" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap2-ninos" min="0" value="0" title="Niños" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap2-mujeres" min="0" value="0" title="Mujeres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="aap2-hombres" min="0" value="0" title="Hombres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                </div>
+                                             </div>
+                                        </div>
+                                    </div>
+
+                                    <!-- PROTECCIÓN (PEAS) -->
+                                    <div class="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+                                        <div class="flex items-center justify-between p-3 border-b border-slate-100">
+                                            <div><p class="text-sm font-bold text-slate-700">Protección Explotación (PEAS)</p><p class="text-[10px] text-slate-500">Sensibilización, Riesgos o Consultas</p></div>
+                                            <div class="relative inline-block w-12 mr-2 align-middle select-none">
+                                                <input type="checkbox" id="tgg-peas" onchange="window.humanHubApp.toggleTransversal('peas')" class="toggle-checkbox absolute block w-6 h-6 rounded-full bg-white border-4 appearance-none cursor-pointer border-slate-300 z-10"/>
+                                                <label for="tgg-peas" class="toggle-label block overflow-hidden h-6 rounded-full bg-slate-300 cursor-pointer"></label>
+                                            </div>
+                                        </div>
+                                        <div id="panel-peas" class="collapsible bg-slate-50 px-3 pb-3">
+                                            <div class="mb-3 mt-2">
+                                                <p class="text-xs text-slate-600 mb-1 font-semibold">1. Sensibilizadas en PEAS / Canales de Reporte:</p>
+                                                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                                    <input type="number" id="peas1-ninas" min="0" value="0" title="Niñas" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas1-ninos" min="0" value="0" title="Niños" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas1-mujeres" min="0" value="0" title="Mujeres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas1-hombres" min="0" value="0" title="Hombres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                </div>
+                                            </div>
+                                            <div class="mb-3">
+                                                <p class="text-xs text-slate-600 mb-1 font-semibold">2. Evaluaciones de Riesgo VBG realizadas a:</p>
+                                                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                                    <input type="number" id="peas2-ninas" min="0" value="0" title="Niñas" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas2-ninos" min="0" value="0" title="Niños" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas2-mujeres" min="0" value="0" title="Mujeres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas2-hombres" min="0" value="0" title="Hombres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <p class="text-xs text-slate-600 mb-1 font-semibold">3. Consultas info. PEAS realizadas a:</p>
+                                                <div class="grid grid-cols-4 gap-2 text-center text-xs">
+                                                    <input type="number" id="peas3-ninas" min="0" value="0" title="Niñas" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas3-ninos" min="0" value="0" title="Niños" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas3-mujeres" min="0" value="0" title="Mujeres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                    <input type="number" id="peas3-hombres" min="0" value="0" title="Hombres" class="w-full px-1 py-1 border rounded text-center outline-none focus:ring-1 focus:ring-brand-300">
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
+                            <!-- VULNERABILIDADES -->
+                            <div>
+                                <p class="text-xs font-bold text-slate-500 mb-3 uppercase">Población con Vulnerabilidad Específica</p>
+                                <div class="space-y-3">
+                                    <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors"><label class="text-sm font-bold text-slate-700"><i class="fa-solid fa-wheelchair text-brand-500 w-6"></i> Con Discapacidad</label><input type="number" id="vul-discapacidad" min="0" value="0" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold outline-none focus:ring-2 focus:ring-brand-400"></div>
+                                    <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors"><label class="text-sm font-bold text-slate-700"><i class="fa-solid fa-person-breastfeeding text-brand-500 w-6"></i> Mujeres Emb/Lactantes</label><input type="number" id="vul-embarazadas" min="0" value="0" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold outline-none focus:ring-2 focus:ring-brand-400"></div>
+                                    <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors"><label class="text-sm font-bold text-slate-700"><i class="fa-solid fa-person-pregnant text-brand-500 w-6"></i> Adol. Emb/Lactantes</label><input type="number" id="vul-adol-emb" min="0" value="0" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold outline-none focus:ring-2 focus:ring-brand-400"></div>
+                                    <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors"><label class="text-sm font-bold text-slate-700"><i class="fa-solid fa-rainbow text-brand-500 w-6"></i> Personas LGBTI</label><input type="number" id="vul-lgbti" min="0" value="0" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold outline-none focus:ring-2 focus:ring-brand-400"></div>
+                                    <div class="flex items-center justify-between bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm hover:border-brand-300 transition-colors"><label class="text-sm font-bold text-slate-700"><i class="fa-solid fa-earth-americas text-brand-500 w-6"></i> Población Indígena</label><input type="number" id="vul-indigenas" min="0" value="0" class="w-16 px-2 py-1 bg-slate-50 border border-slate-200 rounded text-center font-bold outline-none focus:ring-2 focus:ring-brand-400"></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- 4. Matriz Demográfica -->
+                    <div>
+                        <div class="flex justify-between items-end border-b border-slate-100 pb-2 mb-4">
+                            <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400">4. Desglose Poblacional</h3>
+                            <span class="text-[10px] bg-slate-100 text-slate-500 px-2 py-1 rounded font-bold">R = Recurrente | NO-R = Primera vez</span>
+                        </div>
+                        <div class="bg-white rounded-xl border border-slate-200 overflow-hidden shadow-sm overflow-x-auto">
+                            <table class="w-full text-sm text-center min-w-[600px]">
+                                <thead class="bg-slate-50 border-b border-slate-200 text-xs text-slate-500 uppercase">
+                                    <tr>
+                                        <th rowspan="2" class="p-3 border-r border-slate-200 text-left w-1/4">Grupo de Edad</th>
+                                        <th colspan="2" class="p-2 border-r border-slate-200 text-pink-600 bg-pink-50/50">Femenino</th>
+                                        <th colspan="2" class="p-2 border-r border-slate-200 text-blue-600 bg-blue-50/50">Masculino</th>
+                                        <th rowspan="2" class="p-3 font-bold text-slate-800 bg-slate-100 w-20">Total</th>
+                                    </tr>
+                                    <tr class="text-[10px] font-bold">
+                                        <th class="p-2 border-r border-t border-slate-200 bg-pink-50/30">NO-R</th><th class="p-2 border-r border-t border-slate-200 bg-pink-50/30">R</th>
+                                        <th class="p-2 border-r border-t border-slate-200 bg-blue-50/30">NO-R</th><th class="p-2 border-r border-t border-slate-200 bg-blue-50/30">R</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="tbody-edades-dinamico" class="divide-y divide-slate-100"></tbody>
+                                <tfoot>
+                                    <tr class="bg-brand-900 text-white font-bold">
+                                        <td class="p-3 text-right" colspan="5">TOTAL ALCANZADO:</td>
+                                        <td class="p-3 text-xl" id="gran-total">0</td>
+                                    </tr>
+                                </tfoot>
+                            </table>
+                        </div>
+                    </div>
+
+                    <!-- 5. Indicadores e Insumos Físicos -->
+                    <div id="contenedor-indicadores-sector" class="bg-brand-50/50 p-6 sm:p-8 rounded-2xl border border-brand-100 hidden relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-10 bg-brand-700 opacity-5 rounded-bl-full -mr-10 -mt-10"></div>
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-brand-800 mb-6 relative z-10"><i class="fa-solid fa-chart-line mr-2"></i>5. Resultados Cuantitativos e Insumos</h3>
+                        <div id="contenedor-materiales" class="hidden relative z-10 mb-6"><h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest border-t border-brand-200 pt-4 mb-4 flex items-center"><i class="fa-solid fa-box-open text-brand-400 mr-2"></i> Insumos y Materiales Físicos</h4><div id="grid-materiales-carrusel" class="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory hide-scrollbar"></div></div>
+                        <div id="contenedor-folletos" class="hidden relative z-10"><h4 class="text-xs font-bold text-slate-500 uppercase tracking-widest border-t border-brand-200 pt-4 mb-4 flex items-center"><i class="fa-solid fa-book-open text-brand-400 mr-2"></i> Material Educativo y Folletos</h4><div id="grid-folletos-carrusel" class="flex overflow-x-auto gap-4 pb-4 snap-x snap-mandatory hide-scrollbar"></div></div>
+                    </div>
+
+                    <!-- 6. Análisis Cualitativo y PQR -->
+                    <div class="bg-white p-6 sm:p-8 rounded-2xl border border-slate-200 shadow-sm space-y-6">
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2"><i class="fa-solid fa-pen-nib mr-2"></i>6. Análisis Cualitativo de Campo</h3>
+                        
+                        <div>
+                            <label class="block text-sm font-semibold text-slate-700 mb-1.5">Termómetro Comunitario (Receptividad) *</label>
+                            <select id="in-receptividad" required class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm">
+                                <option value="">Selecciona cómo estuvo el ambiente...</option>
+                                <option value="Excelente (Participativa y abierta)">Excelente (Participativa y abierta)</option>
+                                <option value="Buena (Atenta pero pasiva)">Buena (Atenta pero pasiva)</option>
+                                <option value="Regular (Desinterés o distracciones)">Regular (Desinterés o distracciones)</option>
+                                <option value="Tensa (Resistencia al equipo o al tema)">Tensa (Resistencia al equipo o al tema)</option>
+                            </select>
+                        </div>
+
+                        <!-- MODULO PQR -->
+                        <div class="bg-amber-50/50 border border-amber-100 rounded-xl p-4 my-2 hover:border-amber-200 transition-colors">
+                            <div class="flex items-center justify-between mb-2 cursor-pointer group" onclick="window.humanHubApp.toggleTransversal('pqr')">
+                                <div><h4 class="text-xs font-bold text-amber-900 uppercase group-hover:text-amber-700 transition-colors"><i class="fa-solid fa-bullhorn mr-1.5"></i>Mecanismos de Retroalimentación y Quejas</h4><p class="text-[10px] text-amber-700">Registra si recibiste quejas o sugerencias.</p></div>
+                                <i id="icon-pqr" class="fa-solid fa-chevron-down text-amber-500 transition-transform duration-300"></i>
+                            </div>
+                            <div id="panel-pqr" class="collapsible">
+                                <div class="grid grid-cols-2 md:grid-cols-4 gap-3 pt-3 border-t border-amber-200/50 mt-2">
+                                    <div class="bg-white p-2 rounded border text-center"><label class="block text-[10px] font-bold text-slate-600 mb-1 h-8 overflow-hidden">Demanda Información</label><input type="number" id="pqr-info" min="0" value="0" class="w-full text-center py-1 border rounded text-sm outline-none focus:ring-2 focus:ring-amber-400"></div>
+                                    <div class="bg-white p-2 rounded border text-center"><label class="block text-[10px] font-bold text-slate-600 mb-1 h-8 overflow-hidden">Solicitud Asistencia</label><input type="number" id="pqr-asistencia" min="0" value="0" class="w-full text-center py-1 border rounded text-sm outline-none focus:ring-2 focus:ring-amber-400"></div>
+                                    <div class="bg-white p-2 rounded border text-center"><label class="block text-[10px] font-bold text-slate-600 mb-1 h-8 overflow-hidden">Buzones/Sugerencias</label><input type="number" id="pqr-buzon" min="0" value="0" class="w-full text-center py-1 border rounded text-sm outline-none focus:ring-2 focus:ring-amber-400"></div>
+                                    <div class="bg-white p-2 rounded border text-center"><label class="block text-[10px] font-bold text-red-600 mb-1 h-8 overflow-hidden">Quejas Sensibles</label><input type="number" id="pqr-queja" min="0" value="0" class="w-full text-center py-1 border-red-200 bg-red-50 text-red-700 font-bold rounded text-sm outline-none focus:ring-2 focus:ring-red-500"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Logros e Impacto (Apuntes) *</label><textarea id="in-logros" required rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none text-sm focus:ring-2 focus:ring-brand-500"></textarea></div>
+                            <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Desafíos o Nudos Críticos *</label><textarea id="in-desafios" required rows="3" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl outline-none resize-none text-sm focus:ring-2 focus:ring-brand-500"></textarea></div>
+                        </div>
+
+                        <div><label class="block text-sm font-semibold text-slate-700 mb-1.5">Testimonio (Opcional)</label><div class="relative"><i class="fa-solid fa-quote-left absolute left-4 top-3 text-brand-300"></i><input type="text" id="in-testimonio" class="w-full pl-10 pr-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none text-sm italic focus:ring-2 focus:ring-brand-500"></div></div>
+
+                        <!-- Asistente IA de Campo -->
+                        <div class="mt-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-200 relative overflow-hidden">
+                            <div class="absolute top-0 right-0 p-10 bg-blue-500 opacity-5 rounded-bl-full -mr-10 -mt-10"></div>
+                            <h4 class="text-sm font-bold uppercase tracking-wider text-blue-800 mb-3 relative z-10"><i class="fa-solid fa-robot mr-2"></i>Asistente IA: Generar Informe</h4>
+                            <button type="button" onclick="window.humanHubApp.generarNarrativaAutomatica()" id="btn-ia-auto" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center relative z-10 mb-5"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> ✨ Redactar Informe Automático</button>
+                            <div><textarea id="in-narrativa-final" required rows="6" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl outline-none resize-none text-sm relative z-10 shadow-inner focus:ring-2 focus:ring-blue-500"></textarea></div>
+                        </div>
+                    </div>
+
+                    <!-- 7. Casos de Protección -->
+                    <div id="contenedor-casos-proteccion" class="hidden bg-purple-50/50 p-6 sm:p-8 rounded-2xl border border-purple-200 relative overflow-hidden">
+                        <div class="absolute top-0 right-0 p-10 bg-purple-700 opacity-5 rounded-bl-full -mr-10 -mt-10"></div>
+                        <h3 class="text-sm font-bold uppercase tracking-wider text-purple-800 mb-6 relative z-10"><i class="fa-solid fa-shield-heart mr-2"></i>Módulo Casos Gestionados</h3>
+                        <div id="lista-casos-proteccion" class="space-y-4 relative z-10"></div>
+                        <button type="button" onclick="window.humanHubApp.agregarCasoProteccion()" class="mt-4 text-sm bg-purple-100 text-purple-700 hover:bg-purple-200 font-bold px-4 py-2.5 rounded-xl transition flex items-center relative z-10"><i class="fa-solid fa-user-plus mr-2"></i> Añadir un Caso</button>
+                    </div>
+
+                    <!-- 8. Insumos Extras y Foto -->
+                    <div class="grid grid-cols-1 lg:grid-cols-2 gap-10">
+                        <div class="space-y-4"><h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2"><i class="fa-solid fa-box-open mr-2"></i>7. Insumos Extras Genéricos</h3><div id="lista-materiales" class="space-y-2"></div><button type="button" onclick="window.humanHubApp.agregarFilaMaterial()" class="text-sm text-brand-600 font-semibold flex items-center bg-brand-50 px-3 py-2 rounded-lg w-fit hover:bg-brand-100 transition"><i class="fa-solid fa-plus-circle mr-1"></i> Añadir insumo</button></div>
+                        <div><h3 class="text-sm font-bold uppercase tracking-wider text-slate-400 border-b border-slate-100 pb-2 mb-4"><i class="fa-solid fa-camera mr-2"></i>8. Evidencia Fotográfica</h3><div class="border-2 border-dashed border-slate-300 rounded-xl p-6 text-center hover:bg-slate-50 transition cursor-pointer relative overflow-hidden group h-full min-h-[200px] flex items-center justify-center"><input type="file" id="in-foto" accept="image/*" onchange="window.humanHubApp.previsualizarFoto(event)" class="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-10"><div id="foto-preview-container" class="hidden absolute inset-0 bg-black/5 flex items-center justify-center p-2"><img id="foto-preview" class="max-h-full max-w-full object-contain drop-shadow-md rounded"></div><div id="foto-placeholder" class="text-slate-500 group-hover:text-brand-600 transition-colors"><i class="fa-solid fa-camera text-4xl mb-3"></i><p class="text-sm font-medium">Adjuntar fotografía de evidencia</p></div></div></div>
+                    </div>
+                    
+                    <div class="pt-6 border-t border-slate-200">
+                        <button type="button" onclick="window.humanHubApp.procesarReporte()" id="btn-generar" class="w-full bg-brand-700 hover:bg-brand-800 text-white font-bold py-4 px-6 rounded-xl shadow-lg transition-all flex justify-center items-center text-lg"><i class="fa-solid fa-wand-magic-sparkles mr-3"></i> Procesar y Publicar Informe</button>
+                    </div>
+                </form>
+            </div>
+        </section>
+
+        <!-- VISTA 3: DOCUMENTO PDF GENERADO -->
+        <section id="vista-documento" class="hidden slide-up">
+            <div class="mb-6 flex flex-col sm:flex-row justify-between items-center bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+                <button onclick="window.humanHubApp.cambiarPista('formulario')" class="text-slate-500 hover:text-brand-600 font-semibold px-4 py-2 rounded-lg hover:bg-slate-50 transition flex items-center mb-4 sm:mb-0"><i class="fa-solid fa-pen mr-2"></i> Editar Datos</button>
+                <div class="flex gap-3">
+                    <button onclick="window.humanHubApp.generarPDF()" class="bg-white border border-slate-300 text-slate-700 px-5 py-2.5 rounded-xl font-bold hover:bg-slate-50 shadow-sm transition flex items-center"><i class="fa-solid fa-file-pdf text-red-500 mr-2"></i> PDF</button>
+                    <button onclick="window.humanHubApp.guardarReporteBD()" id="btn-guardar-bd" class="bg-secondary-600 text-white px-5 py-2.5 rounded-xl font-bold hover:bg-secondary-900 shadow-md transition flex items-center"><i class="fa-solid fa-cloud-arrow-up mr-2"></i> Guardar BD</button>
+                </div>
+            </div>
+            <div class="bg-slate-200/50 p-4 sm:p-8 rounded-2xl overflow-x-auto"><div id="documento-final" class="paper-preview"></div></div>
+        </section>
+
+        <!-- VISTA 4: DASHBOARD / CENTRO DE MANDO -->
+        <section id="vista-dashboard" class="hidden slide-up">
+             <div class="flex flex-col md:flex-row justify-between items-start md:items-end mb-6 gap-4">
+                <div><h2 class="text-3xl font-extrabold text-slate-900 tracking-tight" id="titulo-centro-mando">Centro de Mando Gerencial</h2><p class="text-slate-500 mt-1" id="subtitulo-centro-mando">Supervisión estratégica y análisis de intervenciones.</p></div>
+                <div class="flex flex-wrap gap-2 items-center bg-white p-2.5 rounded-xl border border-slate-200 shadow-sm">
+                    <div><span class="text-[10px] font-bold text-slate-400 block px-1">DESDE</span><input type="date" id="dash-desde" class="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs outline-none"></div>
+                    <div><span class="text-[10px] font-bold text-slate-400 block px-1">HASTA</span><input type="date" id="dash-hasta" class="px-2 py-1 bg-slate-50 border border-slate-200 rounded text-xs outline-none"></div>
+                    <div id="contenedor-multisector-director" class="flex items-center gap-1 bg-slate-50 border border-slate-200 rounded px-2 py-1"><span class="text-[10px] font-bold text-slate-400">ÁREAS:</span><select id="dash-filtro-sector" class="bg-transparent text-sm font-bold text-brand-900 outline-none"><option value="Todos">Todas las Áreas</option></select></div>
+                    <button onclick="window.humanHubApp.actualizarDashboard()" class="bg-brand-700 text-white px-3 py-1.5 rounded font-bold text-sm hover:bg-brand-800 transition mt-3"><i class="fa-solid fa-filter mr-1"></i> Filtrar</button>
+                </div>
+            </div>
+
+            <!-- NAVEGACIÓN TABS DASHBOARD -->
+            <div class="mb-6 border-b border-slate-200">
+                <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="dash-tabs">
+                    <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('metricas')" id="tab-dash-metricas" class="inline-block p-4 text-brand-600 border-b-2 border-brand-600 rounded-t-lg active focus:outline-none"><i class="fa-solid fa-chart-line mr-2"></i>Tablero Power BI</button></li>
+                    <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('metas')" id="tab-dash-metas" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-bullseye mr-2"></i>Metas y Adenda</button></li>
+                    <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('cualitativos')" id="tab-dash-cualitativos" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-book-open-reader mr-2"></i>Informes Cualitativos</button></li>
+                    <li class="mr-2" id="nav-config-panel"><button onclick="window.humanHubApp.cambiarTabDash('config')" id="tab-dash-config" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-user-gear mr-2"></i>Ajustes y Perfil</button></li>
+                </ul>
+            </div>
+
+            <!-- TAB 1: DASHBOARD METRICAS -->
+            <div id="dash-panel-metricas" class="space-y-8">
+                <!-- Tarjetas Superiores -->
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between"><div><p class="text-xs font-bold text-slate-400 uppercase">Actividades</p><p class="text-3xl font-black text-slate-800 mt-1" id="dash-total-reportes">0</p></div><div class="w-12 h-12 bg-blue-50 text-blue-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-clipboard-list"></i></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between"><div><p class="text-xs font-bold text-slate-400 uppercase">Beneficiarios</p><p class="text-3xl font-black text-slate-800 mt-1" id="dash-total-personas">0</p></div><div class="w-12 h-12 bg-green-50 text-green-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-users"></i></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between"><div><p class="text-xs font-bold text-slate-400 uppercase">Casos Protección</p><p class="text-3xl font-black text-slate-800 mt-1" id="dash-total-casos">0</p></div><div class="w-12 h-12 bg-purple-50 text-purple-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-shield-heart"></i></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 flex items-center justify-between"><div><p class="text-xs font-bold text-slate-400 uppercase">Cumplimiento</p><p class="text-3xl font-black text-slate-800 mt-1" id="dash-porcentaje-meta">0%</p></div><div class="w-12 h-12 bg-orange-50 text-orange-600 rounded-xl flex items-center justify-center text-xl"><i class="fa-solid fa-bullseye"></i></div></div>
+                </div>
+
+                <!-- Gráficos -->
+                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-chart-bar text-brand-600 mr-2"></i>Cumplimiento de Metas</h3><div class="h-72 relative"><canvas id="chartMetas"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 id="titulo-chart-doughnut" class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-chart-pie text-brand-600 mr-2"></i>Aporte Individual por Profesional</h3><div class="h-72 relative"><canvas id="chartProfesionales"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-children text-brand-600 mr-2"></i>Demografía General (Niños vs Adultos)</h3><div class="h-72 relative"><canvas id="chartDemografia"></canvas></div></div>
+                    <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200"><h3 class="text-base font-bold text-slate-800 mb-4 flex items-center"><i class="fa-solid fa-hand-holding-heart text-brand-600 mr-2"></i>Mapa de Vulnerabilidades</h3><div class="h-72 relative"><canvas id="chartVulnerabilidad"></canvas></div></div>
+                </div>
+
+                <!-- Matriz Insumos -->
+                <div class="bg-white rounded-2xl shadow-sm border border-brand-200 overflow-hidden mt-8">
+                    <div class="px-6 py-4 border-b border-brand-100 bg-brand-50 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-brand-900"><i class="fa-solid fa-box-archive mr-2 text-brand-600"></i>Matriz Consolidada de Insumos y Materiales</h3>
+                            <p class="text-[11px] text-brand-700 mt-1">Trazabilidad detallada por área de intervención.</p>
+                        </div>
+                        <button onclick="window.humanHubApp.exportarMatrizInsumosExcel()" class="bg-brand-600 hover:bg-brand-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-md flex items-center"><i class="fa-solid fa-file-excel mr-2"></i> Exportar a Excel</button>
+                    </div>
+                    <div class="overflow-x-auto max-h-[400px]">
+                        <table class="w-full text-xs text-center text-slate-700 border-collapse whitespace-nowrap" id="tabla-matriz-insumos">
+                            <thead class="text-[10px] text-slate-600 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm" id="thead-matriz-insumos"></thead>
+                            <tbody id="tbody-matriz-insumos" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Matriz Beneficiarios -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-6">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-table-cells-large mr-2 text-brand-600"></i>Matriz Consolidada de Beneficiarios</h3>
+                            <p class="text-[11px] text-slate-500 mt-1">Desglose demográfico (No recurrentes y recurrentes) para reportes oficiales.</p>
+                        </div>
+                        <button onclick="window.humanHubApp.exportarMatrizBeneficiariosExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-md flex items-center"><i class="fa-solid fa-file-excel mr-2"></i> Exportar a Excel</button>
+                    </div>
+                    <div class="overflow-x-auto max-h-[500px]">
+                        <table class="w-full text-xs text-center text-slate-700 border-collapse whitespace-nowrap" id="tabla-matriz-beneficiarios">
+                            <thead class="text-[10px] text-slate-600 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm" id="thead-matriz-beneficiarios"></thead>
+                            <tbody id="tbody-matriz-beneficiarios" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Matriz Transversales -->
+                <div class="bg-white rounded-2xl shadow-sm border border-amber-200 overflow-hidden mt-6">
+                    <div class="px-6 py-4 border-b border-amber-100 bg-amber-50 flex justify-between items-center">
+                        <div>
+                            <h3 class="text-lg font-bold text-amber-900"><i class="fa-solid fa-layer-group mr-2 text-amber-600"></i>Matriz Consolidada de Alcance Transversal y PQR</h3>
+                            <p class="text-[11px] text-amber-700 mt-1">Acorde al formato de trazabilidad de enfoques integrados y quejas.</p>
+                        </div>
+                        <button onclick="window.humanHubApp.exportarTransversalesExcel()" class="bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-4 py-2 rounded-lg transition shadow-md flex items-center"><i class="fa-solid fa-file-excel mr-2"></i> Exportar a Excel</button>
+                    </div>
+                    <div class="overflow-x-auto max-h-[500px]">
+                        <table class="w-full text-xs text-center text-slate-700 border-collapse whitespace-nowrap" id="tabla-matriz-transversales">
+                            <thead class="text-[10px] text-slate-600 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm" id="thead-matriz-transversales">
+                                <tr>
+                                    <th rowspan="2" class="px-4 py-2 border-r border-b">ID / Fecha</th>
+                                    <th rowspan="2" class="px-4 py-2 border-r border-b">Sector</th>
+                                    <th colspan="3" class="px-4 py-2 border-r border-b bg-purple-50 text-purple-800">GEN (Género)</th>
+                                    <th colspan="2" class="px-4 py-2 border-r border-b bg-blue-50 text-blue-800">AAP (Rendición Cuentas)</th>
+                                    <th colspan="3" class="px-4 py-2 border-r border-b bg-pink-50 text-pink-800">PEAS (Protección)</th>
+                                    <th colspan="4" class="px-4 py-2 border-b bg-amber-50 text-amber-800">PQR (Quejas)</th>
+                                </tr>
+                                <tr class="text-[9px]">
+                                    <th class="px-2 py-1 border-r border-b" title="¿Aplicó enfoque?">Activo</th><th class="px-2 py-1 border-r border-b">NNA</th><th class="px-2 py-1 border-r border-b">Adultos</th>
+                                    <th class="px-2 py-1 border-r border-b" title="AAP1: Alcanzados con Info">Info (AAP1)</th><th class="px-2 py-1 border-r border-b" title="AAP2: Participando en decisiones">Decis. (AAP2)</th>
+                                    <th class="px-2 py-1 border-r border-b" title="Sensibilizadas PEAS">Sensib (P1)</th><th class="px-2 py-1 border-r border-b" title="Evaluaciones VBG">Riesgos (P2)</th><th class="px-2 py-1 border-r border-b" title="Consultas PEAS">Consul (P3)</th>
+                                    <th class="px-2 py-1 border-r border-b" title="Demanda Información">Dem. Info</th><th class="px-2 py-1 border-r border-b" title="Solicitud Asistencia">Sol. Asist</th><th class="px-2 py-1 border-r border-b">Buzones</th><th class="px-2 py-1 border-b text-red-600">Quejas Sens.</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-matriz-transversales" class="divide-y divide-slate-200"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Últimos Informes -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mt-8 mb-8">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h3 id="titulo-tabla-ultimos" class="text-lg font-bold text-slate-800">Últimos Informes de Coordinación Registrados</h3>
+                    </div>
+                    <div class="overflow-x-auto max-h-[400px]">
+                        <table class="w-full text-sm text-left text-slate-600 whitespace-nowrap">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-100 sticky top-0 z-10 shadow-sm">
+                                <tr>
+                                    <th class="px-6 py-4 border-r">Periodo / Fecha</th>
+                                    <th class="px-6 py-4 border-r">Área / Sector</th>
+                                    <th class="px-6 py-4 border-r">Actividad / Tema</th>
+                                    <th class="px-6 py-4 border-r">Coordinador Responsable</th>
+                                    <th class="px-6 py-4 text-center">Alcance</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tbody-ultimos-informes" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: METAS E INDICADORES (ADENDA) -->
+            <div id="dash-panel-metas" class="hidden space-y-8">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-brand-50 flex justify-between items-center"><h3 class="text-lg font-bold text-brand-800"><i class="fa-solid fa-bullseye mr-2"></i>Configuración de Metas Mensuales</h3><button onclick="window.humanHubApp.guardarMetas()" class="bg-secondary-600 hover:bg-secondary-700 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow-sm">Guardar Metas</button></div>
+                    <div class="p-6">
+                        <p class="text-sm text-slate-500 mb-6" id="lbl-desc-metas">Establece la meta numérica de beneficiarios a alcanzar.</p>
+                        <div id="lista-metas-config" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6"></div>
+                    </div>
+                </div>
+
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50 flex justify-between items-center">
+                        <div><h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-table-list mr-2 text-brand-600"></i>Gestión de Indicadores y Trazabilidad (Adenda UNICEF)</h3><p class="text-xs text-slate-500 mt-0.5">La columna de Trazabilidad IA busca y suma automáticamente las actividades de la BD que responden a cada indicador.</p></div>
+                        <div class="flex gap-2"><button onclick="window.humanHubApp.guardarIndicadoresEditados()" class="bg-secondary-600 hover:bg-secondary-700 text-white text-xs font-bold px-3 py-2 rounded-lg transition"><i class="fa-solid fa-floppy-disk mr-1"></i> Guardar Ediciones</button></div>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600 min-w-[900px]">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                <tr>
+                                    <th class="px-6 py-3 w-1/5">Componente</th>
+                                    <th class="px-6 py-3 w-2/5">Indicador de Rendimiento</th>
+                                    <th class="px-6 py-3 text-center w-1/5">Meta Establecida</th>
+                                    <th class="px-6 py-3 text-left w-1/5 bg-blue-50/50 text-brand-800">Sustento (Trazabilidad IA)</th>
+                                </tr>
+                            </thead>
+                            <tbody id="tabla-adenda-editable" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: INFORMES DE COORDINACIÓN Y ASISTENTE IA -->
+            <div id="dash-panel-cualitativos" class="hidden space-y-6">
+                <!-- Tabla Auditoría / Bandeja Entrada -->
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h3 id="titulo-tabla-cualitativa" class="text-lg font-bold text-slate-800"><i class="fa-solid fa-book-open-reader mr-2 text-brand-600"></i>Auditoría Cualitativa</h3>
+                        <p id="sub-tabla-cualitativa" class="text-xs text-slate-500 mt-0.5">Revisa los informes detallados de tu equipo.</p>
+                    </div>
+                    
+                    <!-- Tabla Coordinador -->
+                    <div id="tabla-coord-container" class="overflow-x-auto hidden">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                <tr><th class="px-6 py-4">Profesional de Campo</th><th class="px-6 py-4 text-center">Total Reportes</th><th class="px-6 py-4 text-center">Personas Alcanzadas</th><th class="px-6 py-4 text-center">Acciones</th></tr>
+                            </thead>
+                            <tbody id="tabla-audit-profesionales" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+
+                    <!-- Tabla Director (Bandeja Entrada) -->
+                    <div id="tabla-director-container" class="overflow-x-auto hidden">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                <tr><th class="px-6 py-4">Fecha de Envío</th><th class="px-6 py-4">Sector Operativo</th><th class="px-6 py-4">Enviado por (Coordinador)</th><th class="px-6 py-4 text-center">Descargar PDF Maestro</th></tr>
+                            </thead>
+                            <tbody id="tabla-bandeja-director" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <!-- Tabla Historial Enviados (Solo Coordinador) -->
+                <div id="tabla-coord-enviados-container" class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden mb-6 hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-brand-50">
+                        <h3 class="text-lg font-bold text-brand-900"><i class="fa-solid fa-clock-rotate-left mr-2"></i>Mis Informes Enviados a Dirección</h3>
+                    </div>
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm text-left text-slate-600">
+                            <thead class="text-xs text-slate-500 uppercase bg-slate-50 border-b border-slate-200">
+                                <tr><th class="px-6 py-4">ID de Envío</th><th class="px-6 py-4">Fecha de Envío</th><th class="px-6 py-4 text-center">Descargar Copia de Respaldo</th></tr>
+                            </thead>
+                            <tbody id="tabla-mis-enviados" class="divide-y divide-slate-100"></tbody>
+                        </table>
+                    </div>
+                </div>
+
+                <!-- Asistente IA Gerencial -->
+                <div id="seccion-ia-gerencial" class="bg-blue-50/50 rounded-2xl border border-blue-200 shadow-sm overflow-hidden relative">
+                    <div class="absolute top-0 right-0 p-10 bg-blue-500 opacity-5 rounded-bl-full -mr-10 -mt-10 pointer-events-none"></div>
+                    <div class="px-6 py-4 border-b border-blue-100 bg-blue-100/50 flex justify-between items-center relative z-10">
+                        <div>
+                            <h3 class="text-lg font-bold text-blue-900"><i class="fa-solid fa-robot mr-2 text-blue-600"></i>Editor y Asistente IA Gerencial</h3>
+                            <p class="text-xs text-blue-700 mt-0.5">Usa la IA para redactar un resumen automático o escribe tu reporte manualmente aquí.</p>
+                        </div>
+                    </div>
+                    <div class="p-6 relative z-10">
+                        <div class="flex flex-wrap gap-3 mb-6">
+                            <button onclick="window.humanHubApp.generarResumenGerencialIA('sintesis')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-brain mr-2"></i> 1. Síntesis IA (Historia)</button>
+                            <button onclick="window.humanHubApp.generarResumenGerencialIA('integral')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-chart-pie mr-2"></i> 2. Informe Integral IA (Datos + Historia)</button>
+                        </div>
+                        
+                        <textarea id="caja-resultado-ia-gerencial" rows="8" placeholder="Escribe aquí tu informe ejecutivo mensual o genera uno con la IA usando los botones de arriba..." class="w-full px-5 py-4 bg-white border border-blue-200 rounded-xl text-sm text-slate-700 shadow-inner whitespace-pre-wrap leading-relaxed outline-none focus:ring-2 focus:ring-blue-500 mb-4" oninput="window.humanHubApp.validarTextoInforme()"></textarea>
+                        
+                        <div class="flex flex-wrap gap-3">
+                            <button id="btn-ia-exportar" onclick="window.humanHubApp.exportarIAaPDF()" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-file-pdf mr-2"></i> Exportar este borrador a PDF</button>
+                            <button id="btn-ia-enviar" onclick="window.humanHubApp.enviarInformeADireccion()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm ml-auto"><i class="fa-solid fa-paper-plane mr-2"></i> Guardar y Enviar Informe Oficial a Dirección</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 4: AJUSTES Y PERFIL -->
+            <div id="dash-panel-config" class="hidden space-y-6">
+                <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+                    <div class="px-6 py-4 border-b border-slate-200 bg-slate-50">
+                        <h3 class="text-lg font-bold text-slate-800"><i class="fa-solid fa-user-gear mr-2 text-brand-600"></i>Configuración de Perfil (Firma de Reportes)</h3>
+                        <p class="text-xs text-slate-500 mt-1">Este nombre se usará automáticamente como firma para ahorrarte tiempo y asegurar la autoría de tus envíos a Dirección.</p>
+                    </div>
+                    <div class="p-6">
+                        <label class="block text-sm font-semibold text-slate-700 mb-1.5">Tu Nombre y Apellido (Ej. Ing. Carlos Gómez) *</label>
+                        <div class="flex flex-col sm:flex-row gap-3">
+                            <input type="text" id="perfil-nombre" class="w-full px-4 py-2.5 bg-slate-50 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-brand-500 text-sm" placeholder="Escribe tu nombre formal aquí...">
+                            <button type="button" onclick="window.humanHubApp.guardarPerfil()" class="bg-brand-700 hover:bg-brand-800 text-white font-bold py-2.5 px-6 rounded-xl transition shadow-sm whitespace-nowrap"><i class="fa-solid fa-floppy-disk mr-2"></i> Guardar Nombre</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- UI TOASTS & MODALS -->
+    <div id="toast-container" class="fixed bottom-4 right-4 z-[100] flex flex-col gap-2"></div>
+
+    <div id="modal-login" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm hidden items-center justify-center z-50 transition-opacity">
+        <div class="bg-white rounded-2xl shadow-2xl p-8 max-w-sm w-full mx-4 transform scale-95 transition-transform slide-up">
+            <div class="text-center">
+                <div class="mx-auto flex items-center justify-center h-16 w-16 rounded-full bg-brand-100 mb-6"><i class="fa-solid fa-lock text-3xl text-brand-700"></i></div>
+                <h3 class="text-xl font-bold text-slate-900 mb-2">Acceso Administrativo</h3>
+                <p class="text-sm text-slate-500 mb-6">Ingresa tu clave de coordinación para entrar al Centro de Mando.</p>
+                <input type="password" id="input-clave" class="w-full px-4 py-3 bg-slate-50 border border-slate-200 rounded-xl focus:ring-2 focus:ring-brand-500 outline-none mb-4 text-center tracking-widest text-lg font-mono" placeholder="••••••••">
+                <button type="button" onclick="window.humanHubApp.verificarClave()" class="w-full inline-flex justify-center rounded-xl bg-brand-700 px-4 py-3 text-sm font-bold text-white shadow-sm hover:bg-brand-800 transition">Entrar al Panel</button>
+                <button type="button" onclick="window.humanHubApp.cerrarModalLogin()" class="mt-4 text-sm text-slate-500 hover:text-slate-700 font-semibold w-full">Cancelar</button>
+            </div>
+        </div>
+    </div>
+    
+    <div id="modal-visor" class="fixed inset-0 bg-slate-900/95 backdrop-blur-sm hidden items-center justify-center z-[60] transition-opacity p-4" onclick="window.humanHubApp.cerrarVisor()">
+        <button class="absolute top-6 right-6 text-slate-300 hover:text-white text-4xl transition-colors drop-shadow-md"><i class="fa-solid fa-circle-xmark"></i></button>
+        <div class="relative max-w-4xl w-full max-h-[90vh] flex flex-col items-center justify-center slide-up" onclick="event.stopPropagation()">
+            <img id="visor-img" src="" class="max-w-full max-h-[80vh] object-contain rounded-lg shadow-2xl border border-slate-700">
+            <p id="visor-titulo" class="text-white font-bold mt-4 text-sm text-center bg-black/60 px-5 py-2 rounded-full uppercase shadow-lg"></p>
+        </div>
+    </div>
+
+    <!-- SCRIPT DE CONEXIÓN MODULAR -->
+    <script type="module" src="./js/app.js"></script>
+</body>
+</html>
