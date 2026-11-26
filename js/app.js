@@ -60,7 +60,7 @@ window.humanHubApp.showToast = (message, type = 'success') => {
     const container = document.getElementById('toast-container');
     const toast = document.createElement('div');
     toast.className = `px-4 py-3 rounded-xl shadow-lg text-white text-sm font-bold flex items-center transform transition-all translate-y-10 opacity-0 ${type === 'success' ? 'bg-emerald-600' : type === 'error' ? 'bg-red-600' : 'bg-brand-600'}`;
-    toast.innerHTML = `<i class="fa-solid ${type === 'success' ? 'fa-check-circle' : type === 'error' ? 'fa-triangle-exclamation' : 'fa-info-circle'} mr-2"></i> ${message}`;
+    toast.textContent = message;
     container.appendChild(toast);
     
     setTimeout(() => { toast.classList.remove('translate-y-10', 'opacity-0'); }, 10);
@@ -297,7 +297,7 @@ window.humanHubApp.generarNarrativaAutomatica = () => {
         const act = document.getElementById('in-actividad').value || 'la actividad';
         const com = document.getElementById('in-comunidad').value || 'la comunidad';
         const total = document.getElementById('gran-total').textContent;
-        const logros = document.getElementById('in-logros').value || 'participación activa';
+        const logros = document.getElementById('in-logros').value || 'No registrado';
         const sector = document.getElementById('in-sector-nombre').value;
         
         let transversales = [];
@@ -307,9 +307,9 @@ window.humanHubApp.generarNarrativaAutomatica = () => {
         
         let textoTrans = transversales.length > 0 ? ` Se integraron ejes transversales de ${transversales.join(', ')}.` : '';
 
-        txt.value = `En el marco de la respuesta humanitaria sector ${sector}, el equipo de FUNDAINIL se desplegó en ${com} para ejecutar ${act}. \n\nDurante la jornada, se logró alcanzar a ${total} personas, destacando como logro principal: ${logros}.${textoTrans} \n\nLa comunidad se mostró receptiva y participativa frente a las intervenciones realizadas.`;
+        txt.value = `En el marco de la respuesta humanitaria sector ${sector}, el equipo de FUNDAINIL se desplegó en ${com} para ejecutar ${act}. \n\nDurante la jornada, se logró alcanzar a ${total} personas, destacando como logro principal: ${logros}.${textoTrans} \n\nReceptividad reportada: ${document.getElementById('in-receptividad').value || 'No registrada'}. Requiere revisión.`;
         
-        btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Generado con IA';
+        btn.innerHTML = '<i class="fa-solid fa-check mr-2"></i> Borrador por plantilla';
         btn.classList.replace('bg-blue-600', 'bg-emerald-600');
         setTimeout(() => {
             btn.innerHTML = '<i class="fa-solid fa-wand-magic-sparkles mr-2"></i> Regenerar Informe';
@@ -397,7 +397,7 @@ window.humanHubApp.procesarReporte = () => {
 
         // 4. Construir Objeto Maestro del Reporte
         const reporte = {
-            id: 'REP-' + Date.now().toString().slice(-6),
+            id: 'REP-' + crypto.randomUUID(),
             fechaCreacion: new Date().toISOString(),
             sectorId: document.getElementById('in-sector-id').value,
             sectorNombre: document.getElementById('in-sector-nombre').value,
@@ -570,7 +570,7 @@ window.humanHubApp.guardarReporteBD = () => {
         dataSimuladaBD.push(window.reporteActual);
         localStorage.setItem('humanhub_bd_reportes', JSON.stringify(dataSimuladaBD));
         
-        window.humanHubApp.showToast('¡Reporte oficializado y guardado en Base de Datos!');
+        window.humanHubApp.showToast('Reporte guardado en este navegador; no sincronizado.');
         btn.innerHTML = '<i class="fa-solid fa-cloud-arrow-up mr-2"></i> Guardado Correctamente';
         btn.classList.replace('bg-secondary-600', 'bg-slate-400');
         btn.disabled = true;
@@ -1015,19 +1015,21 @@ window.humanHubApp.validarTextoInforme = () => {
 
 window.humanHubApp.generarResumenGerencialIA = (tipo) => {
     const caja = document.getElementById('caja-resultado-ia-gerencial');
-    caja.value = "Conectando con Gemini 1.5 Pro...\nAnalizando matrices cualitativas de campo...";
-    caja.disabled = true;
-
-    setTimeout(() => {
-        const sector = usuarioActual.sector || 'Todos';
-        const txtSintesis = `SÍNTESIS GERENCIAL (${sector})\n\nDurante el periodo evaluado, las intervenciones mantuvieron un nivel de receptividad Excelente. El equipo logró superar nudos críticos logísticos, garantizando la entrega oportuna de insumos y la participación comunitaria. Se destacó el cumplimiento en enfoques transversales de protección.`;
-        const txtIntegral = `INFORME INTEGRAL DE COORDINACIÓN - ${sector.toUpperCase()}\n\n1. CONTEXTO OPERATIVO\nLas actividades del mes se desarrollaron superando desafíos climáticos y logísticos. La receptividad general fue catalogada como 'Buena a Excelente'.\n\n2. LOGROS DESTACADOS\n- Cobertura sostenida en comunidades vulnerables.\n- Integración efectiva de charlas PEAS.\n\n3. DESAFÍOS Y RECOMENDACIONES\nSe requiere mayor stock de insumos tipo 2 para el próximo trimestre.`;
-
-        caja.value = tipo === 'sintesis' ? txtSintesis : txtIntegral;
-        caja.disabled = false;
-        window.humanHubApp.validarTextoInforme();
-        window.humanHubApp.showToast('Borrador generado. Puedes editarlo antes de enviarlo.');
-    }, 2000);
+    const desde = document.getElementById('dash-desde').value;
+    const hasta = document.getElementById('dash-hasta').value;
+    if (!usuarioActual || !desde || !hasta || desde > hasta) {
+        window.humanHubApp.showToast('Selecciona un período válido.', 'error'); return;
+    }
+    const rows = dataSimuladaBD.filter(r => r.fecha >= desde && r.fecha <= hasta &&
+        (usuarioActual.rol === 'director' || r.sectorId === usuarioActual.sector || r.sectorNombre === usuarioActual.sector));
+    const valid = rows.filter(r => Number.isSafeInteger(r.totalAlcanzado) && r.totalAlcanzado >= 0);
+    const total = valid.reduce((sum,r)=>sum+r.totalAlcanzado,0);
+    caja.value = ['BORRADOR LOCAL · NO ES UN INFORME VALIDADO', 'Período: '+desde+' al '+hasta,
+        'Registros locales: '+rows.length, 'Asistencias registradas (no personas únicas): '+total,
+        'Registros con total inválido: '+(rows.length-valid.length),
+        'Dificultades y camino a seguir: pendientes de análisis y validación.',
+        'Para análisis con IA real, exporta los registros agregados al Centro de Inteligencia.'].join('\n\n');
+    window.humanHubApp.validarTextoInforme();
 };
 
 window.humanHubApp.enviarInformeADireccion = () => {
@@ -1037,7 +1039,7 @@ window.humanHubApp.enviarInformeADireccion = () => {
     if(!texto || texto.length < 20) return window.humanHubApp.showToast('El informe está vacío.', 'error');
     
     const nuevoInforme = {
-        id: 'INF-' + Date.now().toString().slice(-4),
+        id: 'INF-' + crypto.randomUUID(),
         fechaEnvio: new Date().toISOString().split('T')[0],
         sector: usuarioActual.sector,
         autor: firma,
@@ -1049,7 +1051,7 @@ window.humanHubApp.enviarInformeADireccion = () => {
     
     document.getElementById('caja-resultado-ia-gerencial').value = '';
     window.humanHubApp.validarTextoInforme();
-    window.humanHubApp.showToast('¡Informe Oficial Enviado a la Dirección General!');
+    window.humanHubApp.showToast('Borrador guardado localmente. No se ha enviado.');
     window.humanHubApp.renderizarTablasCualitativas(); // Refrescar tablas
 };
 
