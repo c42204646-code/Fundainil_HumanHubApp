@@ -386,3 +386,12 @@ def send(jid:str, actor=Depends(mutation)):
         con.execute("UPDATE jobs SET state='sent',sent_at=? WHERE id=?",(now(),jid))
         log(con,actor,"sent",jid)
         return public(row_for(con,jid))
+
+
+# Educo MERA module (same authenticated management server)
+from .educo import install as install_educo
+install_educo(app, db, manager, mutation, log, ROOT)
+
+@app.get("/intelligence/educo.css")
+def educo_style(actor=Depends(manager)):
+    return FileResponse(ROOT/"intelligence"/"educo.css", media_type="text/css")
