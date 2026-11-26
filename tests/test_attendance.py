@@ -5,6 +5,7 @@ from server.main import app
 from server.attendance import local_ocr
 
 AUTH=("gerencia","test-password-very-long-123")
+CAPTURE=("campo","test-capture-password-long-456")
 H={"X-HumanHub":"v2"}
 BASE="/api/educo/attendance/"
 def setup(monkeypatch,tmp_path):
@@ -12,9 +13,11 @@ def setup(monkeypatch,tmp_path):
     monkeypatch.setenv("HH_MANAGER_USER",AUTH[0])
     monkeypatch.setenv("HH_MANAGER_PASSWORD",AUTH[1])
     monkeypatch.setenv("HH_ATTENDANCE_ENABLED","1")
+    monkeypatch.setenv("HH_CAPTURE_USER",CAPTURE[0])
+    monkeypatch.setenv("HH_CAPTURE_PASSWORD",CAPTURE[1])
     return TestClient(app)
 def post(c,path,p):
-    return c.post(BASE+path,json=p,auth=AUTH,headers=H)
+    return c.post(BASE+path,json=p,auth=CAPTURE if path=="batches" else AUTH,headers=H)
 def make_batch(codes,day="2026-11-25",phase="original",community="Naiguatá"):
     return {"session":{"phase":phase,"community":community,"space":"S1","day":day,"shift":"AM","slot":1,"service":"Educación"},"codes":codes,"evidence_ref":"LISTA-01"}
 def draft(c,p):
@@ -38,6 +41,8 @@ def test_dedup_across_lists_sites_and_phases(monkeypatch,tmp_path):
     assert post(c,"batches",make_batch([a,a])).status_code==422
     assert post(c,"batches",make_batch(["HH-000000000000"])).status_code==422
     first=draft(c,make_batch([a,b]))
+    assert c.post(BASE+"batches/"+first+"/approve",json={"confirmed":True},auth=CAPTURE,headers=H).status_code==403
+    assert c.post(BASE+"batches",json=make_batch([a]),auth=AUTH,headers=H).status_code==403
     assert stats(c) is None
     assert approve(c,first)["inserted"]==2
     assert post(c,"batches/"+first+"/approve",{"confirmed":True}).status_code==409
@@ -56,7 +61,7 @@ def test_flag_and_image_validation(monkeypatch,tmp_path):
     monkeypatch.setenv("HH_ATTENDANCE_ENABLED","0")
     assert post(c,"participants",{"category":"NNA","confirmed_new":True}).status_code==503
     monkeypatch.setenv("HH_ATTENDANCE_ENABLED","1")
-    assert c.post(BASE+"ocr",content=b"bad",headers={**H,"Content-Type":"image/jpeg"},auth=AUTH).status_code==422
+    assert c.post(BASE+"ocr",content=b"bad",headers={**H,"Content-Type":"image/jpeg"},auth=CAPTURE).status_code==422
 
 def test_real_local_ocr():
     import pytest
