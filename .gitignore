@@ -7,3 +7,5 @@ var/
 __pycache__/
 .pytest_cache/
 .venv/
+
+sandbox-dist/
