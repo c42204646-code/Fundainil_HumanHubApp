@@ -59,6 +59,16 @@ class Activity(Strict):
     adult_attendance: int = Field(ge=0,strict=True)
     evidence: str = Field(min_length=1,max_length=200)
 
+class Logistics(Strict):
+    item: str = Field(min_length=1,max_length=100)
+    unit: str = Field(min_length=1,max_length=40)
+    required_qty: int | None = Field(default=None,ge=0,strict=True)
+    acquired_qty: int | None = Field(default=None,ge=0,strict=True)
+    distributed_qty: int | None = Field(default=None,ge=0,strict=True)
+    available_qty: int | None = Field(default=None,ge=0,strict=True)
+    status: Literal["Por solicitar","Cotización","Ordenado","Recibido","Distribución","Cerrado","No aplica"]
+    evidence: str = Field(default="",max_length=200)
+
 class Form(Strict):
     phase: Literal["original","expansion","integrated"]
     scope: Literal["community","project"]
@@ -87,14 +97,15 @@ class Form(Strict):
     challenges: str = Field(default="",max_length=1500)
     next_steps: str = Field(default="",max_length=1500)
     materials: str = Field(default="",max_length=1000)
+    logistics: list[Logistics] = Field(default_factory=list,max_length=50)
     evidence_ref: str = Field(min_length=1,max_length=200)
     @model_validator(mode="after")
     def reconcile(self):
         if self.start>self.end: raise ValueError("Período inválido")
         if self.scope=="community" and self.community not in COMMUNITIES:
             raise ValueError("Seleccione comunidad")
-        if self.scope=="project" and self.community is not None:
-            raise ValueError("Consolidado de proyecto no tiene comunidad")
+        if self.scope=="project" and (self.community is not None or self.space_code!="CONSOLIDADO"):
+            raise ValueError("Consolidado de proyecto requiere código CONSOLIDADO y no tiene comunidad")
         if len({x.indicator for x in self.measurements})!=len(self.measurements):
             raise ValueError("Indicador duplicado")
         if len({p.age for p in self.population})!=len(self.population):
@@ -226,3 +237,23 @@ def install(app,db,manager,mutation,log,root):
             m=row["measurement"] or {}
             w.writerow([safe(x) for x in (phase,row["code"],row["label"],row["kind"],row["target"],row["value"],m.get("cutoff"),m.get("evidence"))])
         return Response("\ufeff"+buf.getvalue(),media_type="text/csv",headers={"Content-Disposition":"attachment; filename=educo-indicadores.csv"})
+
+def evidence_for_period(con, phase, start, end):
+    """Only validated project-wide snapshots; no field free text, protection cases or identifiers."""
+    exists=con.execute("SELECT 1 FROM sqlite_master WHERE type='table' AND name='educo_forms'").fetchone()
+    if not exists: return None
+    rows=con.execute("""SELECT end,payload FROM educo_forms WHERE phase=? AND scope='project'
+        AND state='validated' AND start>=? AND end<=? ORDER BY end DESC, start ASC, created DESC""",
+        (phase,start,end))
+    observed={}
+    for row in rows:
+        for m in json.loads(row["payload"])["measurements"]:
+            k=m["indicator"]
+            if k in observed: continue
+            i=CATALOG[k]
+            value=round(100*m["favorable"]/m["evaluated"],2) if i["kind"]=="rate" else m["accumulated"]
+            observed[k]={"code":i["code"],"label":i["label"],"kind":i["kind"],"target_reference":i.get(phase),
+                "period_value":m["real"],"cumulative_or_rate":value,"favorable":m["favorable"],
+                "evaluated":m["evaluated"],"cutoff":row["end"]}
+    if not observed: return None
+    return {"phase":phase,"indicators":list(observed.values()),"note":"Metas de ampliación propuestas; los cortes y períodos de medición pueden diferir. No sumar indicadores de personas ni fases. Los valores nulos son no disponibles. No inferir impacto ni testimonios."}
