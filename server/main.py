@@ -421,3 +421,7 @@ install_educo(app, db, manager, mutation, log, ROOT)
 @app.get("/intelligence/educo.css")
 def educo_style(actor=Depends(manager)):
     return FileResponse(ROOT/"intelligence"/"educo.css", media_type="text/css")
+
+# Local OCR and coded attendance pilot
+from .attendance import install as install_attendance
+install_attendance(app, db, manager, mutation, log, ROOT)
