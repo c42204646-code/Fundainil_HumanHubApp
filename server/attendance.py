@@ -1,5 +1,5 @@
 """Local OCR and reviewed coded attendance. Never persist images or raw transcription."""
-import io, os, re, shutil, sqlite3, subprocess, tempfile, uuid, warnings
+import io, os, re, shutil, subprocess, uuid, warnings
 from datetime import date, datetime, timezone
 from typing import Literal
 from fastapi import Depends, HTTPException, Request
@@ -55,6 +55,7 @@ class Session(Strict):
 class Batch(Strict):
     session: Session
     codes: list[str]=Field(min_length=1,max_length=250)
+    evidence_ref: str=Field(pattern=r"^[A-Za-z0-9_-]{1,100}$")
     @model_validator(mode="after")
     def check(self):
         if any(not CODE.fullmatch(c) for c in self.codes):
