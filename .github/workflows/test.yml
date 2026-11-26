@@ -24,3 +24,6 @@ jobs:
       - run: node --check intelligence/educo.js
 
       - run: node --check intelligence/attendance.js
+
+      - run: node --check preview/sandbox.js
+      - run: node scripts/build-sandbox.mjs
