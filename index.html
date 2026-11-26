@@ -60,11 +60,11 @@
     <!-- CARGADOR INICIAL -->
     <div id="cargador-inicial" class="fixed inset-0 bg-white z-40 flex flex-col items-center justify-center fade-in">
         <div class="loader w-12 h-12 mb-4 border-t-brand-700 border-4"></div>
-        <p class="text-brand-700 font-bold animate-pulse">Sincronizando con Servidores FUNDAINIL...</p>
+        <p class="text-brand-700 font-bold animate-pulse">Cargando versión local de HumanHub...</p>
     </div>
 
     <!-- CONTENEDOR PRINCIPAL -->
-    <main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
+    <aside class="max-w-7xl mx-auto w-full px-4 py-3 text-sm bg-amber-50 text-amber-900 border-b border-amber-200"><strong>Modo legado local (demostración).</strong> No ingresar datos personales, expedientes, fotografías ni quejas sensibles. Los registros no se sincronizan ni se envían por correo. <a class="underline font-bold" href="./intelligence/index.html">Centro de inteligencia (requiere servidor)</a> <button type="button" class="underline font-bold ml-3" id="hh-export-aggregate">Exportar registros agregados</button></aside><main class="flex-grow w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 md:py-10">
         
         <!-- VISTA 1: SELECTOR -->
         <section id="vista-selector" class="hidden slide-up">
@@ -323,7 +323,7 @@
                         <div class="mt-8 bg-blue-50/50 p-6 rounded-2xl border border-blue-200 relative overflow-hidden">
                             <div class="absolute top-0 right-0 p-10 bg-blue-500 opacity-5 rounded-bl-full -mr-10 -mt-10"></div>
                             <h4 class="text-sm font-bold uppercase tracking-wider text-blue-800 mb-3 relative z-10"><i class="fa-solid fa-robot mr-2"></i>Asistente IA: Generar Informe</h4>
-                            <button type="button" onclick="window.humanHubApp.generarNarrativaAutomatica()" id="btn-ia-auto" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center relative z-10 mb-5"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> ✨ Redactar Informe Automático</button>
+                            <button type="button" onclick="window.humanHubApp.generarNarrativaAutomatica()" id="btn-ia-auto" class="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center relative z-10 mb-5"><i class="fa-solid fa-wand-magic-sparkles mr-2"></i> ✨ Redactar borrador por plantilla</button>
                             <div><textarea id="in-narrativa-final" required rows="6" class="w-full px-4 py-3 bg-white border border-blue-200 rounded-xl outline-none resize-none text-sm relative z-10 shadow-inner focus:ring-2 focus:ring-blue-500"></textarea></div>
                         </div>
                     </div>
@@ -376,7 +376,7 @@
             <!-- NAVEGACIÓN TABS DASHBOARD -->
             <div class="mb-6 border-b border-slate-200">
                 <ul class="flex flex-wrap -mb-px text-sm font-medium text-center" id="dash-tabs">
-                    <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('metricas')" id="tab-dash-metricas" class="inline-block p-4 text-brand-600 border-b-2 border-brand-600 rounded-t-lg active focus:outline-none"><i class="fa-solid fa-chart-line mr-2"></i>Tablero Power BI</button></li>
+                    <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('metricas')" id="tab-dash-metricas" class="inline-block p-4 text-brand-600 border-b-2 border-brand-600 rounded-t-lg active focus:outline-none"><i class="fa-solid fa-chart-line mr-2"></i>Tablero de indicadores</button></li>
                     <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('metas')" id="tab-dash-metas" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-bullseye mr-2"></i>Metas y Adenda</button></li>
                     <li class="mr-2"><button onclick="window.humanHubApp.cambiarTabDash('cualitativos')" id="tab-dash-cualitativos" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-book-open-reader mr-2"></i>Informes Cualitativos</button></li>
                     <li class="mr-2" id="nav-config-panel"><button onclick="window.humanHubApp.cambiarTabDash('config')" id="tab-dash-config" class="inline-block p-4 border-b-2 border-transparent rounded-t-lg hover:text-slate-600 hover:border-slate-300 text-slate-500 transition-colors focus:outline-none"><i class="fa-solid fa-user-gear mr-2"></i>Ajustes y Perfil</button></li>
@@ -576,15 +576,15 @@
                     </div>
                     <div class="p-6 relative z-10">
                         <div class="flex flex-wrap gap-3 mb-6">
-                            <button onclick="window.humanHubApp.generarResumenGerencialIA('sintesis')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-brain mr-2"></i> 1. Síntesis IA (Historia)</button>
-                            <button onclick="window.humanHubApp.generarResumenGerencialIA('integral')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-chart-pie mr-2"></i> 2. Informe Integral IA (Datos + Historia)</button>
+                            <button onclick="window.humanHubApp.generarResumenGerencialIA('sintesis')" class="bg-purple-600 hover:bg-purple-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-brain mr-2"></i> 1. Síntesis local de registros</button>
+                            <button onclick="window.humanHubApp.generarResumenGerencialIA('integral')" class="bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-chart-pie mr-2"></i> 2. Informe integral local</button>
                         </div>
                         
                         <textarea id="caja-resultado-ia-gerencial" rows="8" placeholder="Escribe aquí tu informe ejecutivo mensual o genera uno con la IA usando los botones de arriba..." class="w-full px-5 py-4 bg-white border border-blue-200 rounded-xl text-sm text-slate-700 shadow-inner whitespace-pre-wrap leading-relaxed outline-none focus:ring-2 focus:ring-blue-500 mb-4" oninput="window.humanHubApp.validarTextoInforme()"></textarea>
                         
                         <div class="flex flex-wrap gap-3">
                             <button id="btn-ia-exportar" onclick="window.humanHubApp.exportarIAaPDF()" class="hidden bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm"><i class="fa-solid fa-file-pdf mr-2"></i> Exportar este borrador a PDF</button>
-                            <button id="btn-ia-enviar" onclick="window.humanHubApp.enviarInformeADireccion()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm ml-auto"><i class="fa-solid fa-paper-plane mr-2"></i> Guardar y Enviar Informe Oficial a Dirección</button>
+                            <button id="btn-ia-enviar" onclick="window.humanHubApp.enviarInformeADireccion()" class="hidden bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 px-6 rounded-xl shadow-sm transition-all flex items-center justify-center text-sm ml-auto"><i class="fa-solid fa-paper-plane mr-2"></i> Guardar borrador local (sin envío)</button>
                         </div>
                     </div>
                 </div>
@@ -635,5 +635,6 @@
 
     <!-- SCRIPT DE CONEXIÓN MODULAR -->
     <script type="module" src="./js/app.js"></script>
+<script type="module" src="./js/aggregate-export.js"></script>
 </body>
 </html>
