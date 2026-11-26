@@ -19,3 +19,5 @@ jobs:
       - run: node --check intelligence/app.js
       - run: node --input-type=module --check < js/aggregate-export.js
       - run: node --input-type=module --check < js/app.js
+
+      - run: node --check intelligence/educo.js
