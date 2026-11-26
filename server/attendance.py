@@ -1,8 +1,9 @@
 """Local OCR and reviewed coded attendance. Never persist images or raw transcription."""
-import io, os, re, shutil, subprocess, uuid, warnings
+import io, os, re, shutil, subprocess, uuid, warnings, hmac
 from datetime import date, datetime, timezone
 from typing import Literal
-from fastapi import Depends, HTTPException, Request
+from fastapi import Depends, HTTPException, Request, Header
+from fastapi.security import HTTPBasic, HTTPBasicCredentials
 from fastapi.responses import FileResponse
 from PIL import Image, ImageOps, UnidentifiedImageError
 from pydantic import BaseModel, ConfigDict, Field, model_validator
@@ -125,29 +126,54 @@ def local_ocr(data):
     return {"text":text,"codes":codes,"warning":"Transcripción preliminar. Compare cada fila con la foto; no se registró asistencia."}
 
 def install(app,db,manager,mutation,log,root):
+    basic=HTTPBasic()
+    def access(c:HTTPBasicCredentials=Depends(basic)):
+        # Dedicated capture account; managerial credentials stay separate.
+        u,p=os.getenv("HH_MANAGER_USER"),os.getenv("HH_MANAGER_PASSWORD")
+        cu,cp=os.getenv("HH_CAPTURE_USER"),os.getenv("HH_CAPTURE_PASSWORD")
+        def match(user,password):
+            return bool(user and password and len(password)>=20 and
+                hmac.compare_digest(c.username.encode(),user.encode()) and
+                hmac.compare_digest(c.password.encode(),password.encode()))
+        if match(u,p): return {"actor":u,"role":"review"}
+        if cu!=u and cp!=p and match(cu,cp): return {"actor":cu,"role":"capture"}
+        raise HTTPException(401,"Acceso no autorizado",headers={"WWW-Authenticate":"Basic"})
+    def allowed(auth=Depends(access),x_humanhub:str=Header(default="")):
+        if x_humanhub!="v2": raise HTTPException(403,"Cabecera de seguridad requerida")
+        if os.getenv("HH_ATTENDANCE_ENABLED")!="1":
+            raise HTTPException(503,"Piloto desactivado; habilitar solo para pruebas autorizadas.")
+        return auth
+    def capture(auth=Depends(allowed)):
+        if auth["role"]!="capture": raise HTTPException(403,"Use la cuenta separada de captura.")
+        return auth["actor"]
+    def reviewer(auth=Depends(allowed)):
+        if auth["role"]!="review": raise HTTPException(403,"Se requiere cuenta de revisión.")
+        return auth["actor"]
     @app.get("/educo/asistencia")
-    def page(actor=Depends(manager)):
+    def page(auth=Depends(access)):
         return FileResponse(root/"intelligence"/"attendance.html")
     @app.get("/intelligence/attendance.js")
-    def script(actor=Depends(manager)):
+    def script(auth=Depends(access)):
         return FileResponse(root/"intelligence"/"attendance.js",media_type="text/javascript")
+    @app.get("/intelligence/attendance-style.css")
+    def attendance_style(auth=Depends(access)):
+        return FileResponse(root/"intelligence"/"style.css",media_type="text/css")
+    @app.get("/intelligence/attendance-extra.css")
+    def attendance_extra(auth=Depends(access)):
+        return FileResponse(root/"intelligence"/"educo.css",media_type="text/css")
     @app.get("/api/educo/attendance/config")
-    def config(actor=Depends(manager)):
+    def config(auth=Depends(access)):
         return {"communities":COMMUNITIES,"services":SERVICES,"ocr_local":bool(shutil.which("tesseract")),
-                "enabled":os.getenv("HH_ATTENDANCE_ENABLED")=="1"}
-    def enabled(actor=Depends(mutation)):
-        if os.getenv("HH_ATTENDANCE_ENABLED")!="1":
-            raise HTTPException(503,"Piloto de asistencia desactivado. Configure HH_ATTENDANCE_ENABLED=1 solo para pruebas autorizadas.")
-        return actor
+                "enabled":os.getenv("HH_ATTENDANCE_ENABLED")=="1","role":auth["role"]}
     @app.post("/api/educo/attendance/ocr")
-    async def ocr(request:Request,actor=Depends(enabled)):
+    async def ocr(request:Request,actor=Depends(capture)):
         from starlette.concurrency import run_in_threadpool
         if request.headers.get("content-type","") not in ("image/jpeg","image/png","image/webp"):
             raise HTTPException(415,"Formato de imagen no admitido")
         data=await request.body()
         return await run_in_threadpool(local_ocr,data)
     @app.post("/api/educo/attendance/participants")
-    def register(data:Register,actor=Depends(enabled)):
+    def register(data:Register,actor=Depends(reviewer)):
         code="HH-"+uuid.uuid4().hex[:12].upper()
         with db() as con:
             init(con)
@@ -155,7 +181,7 @@ def install(app,db,manager,mutation,log,root):
             log(con,actor,"educo_participant_code_created",code)
         return {"code":code,"category":data.category}
     @app.post("/api/educo/attendance/batches")
-    def draft(data:Batch,actor=Depends(enabled)):
+    def draft(data:Batch,actor=Depends(capture)):
         bid=str(uuid.uuid4())
         with db() as con:
             init(con);con.execute("BEGIN IMMEDIATE")
@@ -166,14 +192,15 @@ def install(app,db,manager,mutation,log,root):
             log(con,actor,"educo_attendance_draft",bid)
         return {"id":bid,"state":"review"}
     @app.get("/api/educo/attendance/batches")
-    def batches(actor=Depends(manager)):
+    def batches(auth=Depends(access)):
+        if auth["role"]!="review": return []
         with db() as con:
             init(con)
             return [dict(id=r["id"],state=r["state"],created=r["created"],reviewed_at=r["reviewed_at"],
                          inserted=r["inserted"],repeated=r["repeated"],payload=json.loads(r["payload"]))
                     for r in con.execute("SELECT * FROM educo_attendance_batches ORDER BY created DESC LIMIT 100")]
     @app.post("/api/educo/attendance/batches/{bid}/discard")
-    def discard(bid:str,data:Review,actor=Depends(enabled)):
+    def discard(bid:str,data:Review,actor=Depends(reviewer)):
         with db() as con:
             init(con)
             changed=con.execute("UPDATE educo_attendance_batches SET state='discarded' WHERE id=? AND state='review'",(bid,)).rowcount
@@ -181,7 +208,7 @@ def install(app,db,manager,mutation,log,root):
             log(con,actor,"educo_attendance_discarded",bid)
         return {"state":"discarded"}
     @app.post("/api/educo/attendance/batches/{bid}/approve")
-    def approve(bid:str,data:Review,actor=Depends(enabled)):
+    def approve(bid:str,data:Review,actor=Depends(reviewer)):
         with db() as con:
             init(con);con.execute("BEGIN IMMEDIATE")
             row=con.execute("SELECT * FROM educo_attendance_batches WHERE id=?",(bid,)).fetchone()
