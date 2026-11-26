@@ -58,6 +58,8 @@ function setup(){
  $("add-activity").addEventListener("click",()=>{const a=make("div");a.className="activity grid";const day=make("input");day.type="date";day.name="day";day.required=true;const ref=make("input");ref.name="evidence";ref.required=true;ref.maxLength=200;
  const p=form.elements.phase.value, codes=p==="integrated"?[...catalog.activities.original,...catalog.activities.expansion]:catalog.activities[p];const del=make("button","Quitar");del.type="button";del.addEventListener("click",()=>a.remove());
  a.append(label("Fecha",day),label("Turno",select("shift",[["AM","AM"],["PM","PM"],["Ambos","Ambos"]])),label("Actividad",select("code",codes.map(c=>[c,c]))),label("Asistencias NNA",num("nna_attendance")),label("Asistencias adultos",num("adult_attendance")),label("FFVV",ref),del);$("activities").append(a)});
+ $("add-logistics").addEventListener("click",()=>{const a=make("div");a.className="activity grid";const item=make("input");item.name="item";item.required=true;item.maxLength=100;const unit=make("input");unit.name="unit";unit.required=true;unit.maxLength=40;const ref=make("input");ref.name="evidence";ref.maxLength=200;const del=make("button","Quitar");del.type="button";del.addEventListener("click",()=>a.remove());
+ a.append(label("Insumo / compra",item),label("Unidad",unit),label("Cantidad requerida",num("required_qty")),label("Adquirida",num("acquired_qty")),label("Distribuida",num("distributed_qty")),label("Disponible",num("available_qty")),label("Estado",select("status",["Por solicitar","Cotización","Ordenado","Recibido","Distribución","Cerrado","No aplica"].map(v=>[v,v]))),label("FFVV",ref),del);$("logistics").append(a)});
  form.elements.phase.addEventListener("change",()=>{if($("activities").children.length){say("Revisa los códigos de actividad tras cambiar de fase; el servidor validará.");}});
 }
 function payload(){
@@ -68,11 +70,12 @@ function payload(){
  p.population=readRows("population").map(([age,r])=>({age,...r}));
  p.adult_counts=Object.fromEntries(readRows("adults"));p.schooling=readGroup("school");p.displacement=readGroup("displacement");p.protection=readGroup("protection");
  for(const k of ["new_nna","previous_nna","nna_attendance"])p[k]=val(x[k]);
+ p.logistics=[...$("logistics").children].map(a=>Object.fromEntries([...a.querySelectorAll("input,select")].map(e=>[e.name,e.type==="number"?val(e):e.value.trim()])));
  p.activities=[...$("activities").children].map(a=>Object.fromEntries([...a.querySelectorAll("input,select")].map(e=>[e.name,e.type==="number"?val(e):e.value])));
  p.measurements=[...$("measures").children].filter(d=>d.querySelector("[name=enabled]").checked).map(d=>({indicator:d.dataset.indicator,...Object.fromEntries([...d.querySelectorAll("input:not([type=checkbox])")].map(e=>[e.name,e.type==="number"?val(e):e.value.trim()]))}));
  return p;
 }
-form.addEventListener("submit",async e=>{e.preventDefault();const b=form.querySelector("button[type=submit]")||form.lastElementChild;b.disabled=true;try{const result=await api("forms",payload());say("Ficha guardada para revisión: "+result.id);form.reset();$("activities").replaceChildren();form.elements.scope.dispatchEvent(new Event("change"));total();panel("review")}catch(err){say(err.message)}finally{b.disabled=false}});
+form.addEventListener("submit",async e=>{e.preventDefault();const b=form.querySelector("button[type=submit]")||form.lastElementChild;b.disabled=true;try{const result=await api("forms",payload());say("Ficha guardada para revisión: "+result.id);form.reset();$("activities").replaceChildren();$("logistics").replaceChildren();form.elements.scope.dispatchEvent(new Event("change"));total();panel("review")}catch(err){say(err.message)}finally{b.disabled=false}});
 async function history(){
  const rows=await api("forms");
  $("forms").replaceChildren(...rows.map(r=>{
