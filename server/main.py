@@ -121,6 +121,7 @@ class Job(Strict):
     end: date
     task: Literal["informe","seguimiento","convocatorias","elegibilidad"]
     brief: str = Field(default="", max_length=2500)
+    educo_phase: Literal["original","expansion","integrated"] = "expansion"
     @model_validator(mode="after")
     def check(self):
         if self.start > self.end:
@@ -222,9 +223,14 @@ def create_job(spec: Job, actor=Depends(mutation)):
         rows = [json.loads(r["payload"]) for r in con.execute(
             "SELECT payload FROM reports WHERE project=? AND day BETWEEN ? AND ? ORDER BY day,id",
             (spec.project,spec.start.isoformat(),spec.end.isoformat()))] if spec.agent=="ATLAS" else []
-        if spec.agent=="ATLAS" and not rows:
-            raise HTTPException(422, "No existen registros agregados para ese proyecto y período.")
-        evidence = summary(rows) if rows else {"nota":"Investigación pública; no se envían registros de campo."}
+        if spec.agent=="ATLAS" and spec.project.strip().casefold() == "educo":
+            evidence=educo_evidence(con,spec.educo_phase,spec.start.isoformat(),spec.end.isoformat())
+            if evidence is None:
+                raise HTTPException(422,"No hay consolidado EDUCO validado para la fase y el período. Complete MERA.")
+        else:
+            if spec.agent=="ATLAS" and not rows:
+                raise HTTPException(422, "No existen registros agregados para ese proyecto y período.")
+            evidence = summary(rows) if rows else {"nota":"Investigación pública; no se envían registros de campo."}
         con.execute("INSERT INTO jobs(id,agent,project,created,state,spec,evidence) VALUES(?,?,?,?,?,?,?)",
                     (jid,spec.agent,spec.project,now(),"running",spec.model_dump_json(),json.dumps(evidence,ensure_ascii=False)))
         log(con,actor,"job_started",jid)
@@ -271,6 +277,11 @@ def paragraphs(row):
     if "asistencias" in evidence:
         out += ["Actividades registradas: "+str(evidence["actividades"]),"Asistencias registradas: "+str(evidence["asistencias"]),evidence["nota"]]
         out += [k+": "+str(v) for k,v in evidence["desagregados"].items()]
+    if "indicators" in evidence:
+        out += ["Fase EDUCO: "+evidence["phase"],evidence["note"]]
+        for i in evidence["indicators"]:
+            value=i["cumulative_or_rate"]
+            out.append(i["code"]+" | "+i["label"]+" | Meta referencia: "+str(i["target_reference"] if i["target_reference"] is not None else "N/D")+" | Valor al corte: "+str(value if value is not None else "N/D")+(" %" if value is not None and i["kind"]=="rate" else "")+" | "+i["cutoff"])
     out += ["Narrativa",*row["narrative"].splitlines()]
     return out
 
@@ -294,6 +305,21 @@ def artifact(row, fmt):
         mime="application/pdf"
     elif fmt=="xlsx":
         data=json.loads(row["evidence"])
+        if "indicators" in data:
+            wb=Workbook()
+            ws=wb.active
+            ws.title="MERA"
+            ws.append(["Código","Indicador","Tipo","Meta referencia","Real período","Acumulado o %","Favorable","Evaluado","Corte"])
+            for i in data["indicators"]:
+                ws.append([i["code"],i["label"],i["kind"],i["target_reference"],i["period_value"],i["cumulative_or_rate"],i["favorable"],i["evaluated"],i["cutoff"]])
+            for cell in ws[1]:
+                cell.fill=PatternFill("solid",fgColor="003366")
+                cell.font=Font(color="FFFFFF",bold=True)
+            ws.freeze_panes="A2"
+            for col in ("A","C","D","E","F","G","H","I"): ws.column_dimensions[col].width=20
+            ws.column_dimensions["B"].width=75
+            wb.save(buf)
+            return buf.getvalue(),"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
         if "asistencias" not in data:
             raise HTTPException(422,"Excel de indicadores disponible para ATLAS.")
         wb=Workbook()
@@ -389,7 +415,7 @@ def send(jid:str, actor=Depends(mutation)):
 
 
 # Educo MERA module (same authenticated management server)
-from .educo import install as install_educo
+from .educo import install as install_educo, evidence_for_period as educo_evidence
 install_educo(app, db, manager, mutation, log, ROOT)
 
 @app.get("/intelligence/educo.css")
