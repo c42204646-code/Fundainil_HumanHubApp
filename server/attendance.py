@@ -122,7 +122,7 @@ def local_ocr(data):
     except (subprocess.TimeoutExpired,subprocess.CalledProcessError,OSError):
         raise HTTPException(503,"No se pudo transcribir localmente. Revise el motor OCR o use captura manual.")
     text=p.stdout.decode("utf-8",errors="replace")[:30000]
-    codes=list(dict.fromkeys(re.findall(r"\bHH-[A-F0-9]{12}\b",text.upper())))
+    codes=re.findall(r"\bHH-[A-F0-9]{12}\b",text.upper())
     return {"text":text,"codes":codes,"warning":"Transcripción preliminar. Compare cada fila con la foto; no se registró asistencia."}
 
 def install(app,db,manager,mutation,log,root):
