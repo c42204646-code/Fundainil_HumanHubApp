@@ -62,7 +62,7 @@ submit("batch",async f=>{
  if(!x.checked_rows.checked)throw Error("La revisión de filas es obligatoria.");
  const session={phase:x.phase.value,community:x.community.value,space:x.space.value.trim().toUpperCase(),day:x.day.value,shift:x.shift.value,slot:Number(x.slot.value),service:x.service.value};
  const result=await post("batches",{session,codes,evidence_ref:x.evidence_ref.value.trim()});
- clearImage();$("codes").value="";x.checked_rows.checked=false;updateCount();say("Borrador guardado: "+result.id+". Aún no cuenta como asistencia.");await history();
+ clearImage();$("codes").value="";x.checked_rows.checked=false;updateCount();say("Borrador guardado: "+result.id+". Aún no cuenta como asistencia.");if(config.role==="review")await history();
 });
 async function history(){
  const rows=await request("batches");
@@ -90,7 +90,10 @@ $("refresh").addEventListener("click",()=>history().catch(e=>say(e.message)));
 window.addEventListener("pagehide",()=>{clearImage();$("codes").value="";$("issued").textContent=""});
 (async()=>{try{
  config=await request("config");fillSelect("community",config.communities);fillSelect("service",config.services);
- $("availability").textContent=(config.enabled?"Piloto habilitado":"Piloto desactivado por defecto")+" · OCR local "+(config.ocr_local?"instalado":"pendiente");
+ const reviewing=config.role==="review";
+ for(const id of ["register-panel","review-panel","summary-panel","back-mera"])$(id).hidden=!reviewing;
+ for(const id of ["capture-panel","draft-panel"])$(id).hidden=reviewing;
+ $("availability").textContent=(reviewing?"Revisión":"Captura")+" · "+(config.enabled?"Piloto habilitado":"Piloto desactivado por defecto")+" · OCR local "+(config.ocr_local?"instalado":"pendiente");
  for(const id of ["register","batch"])$(id).querySelector("button").disabled=!config.enabled;
- await history();updateCount();
+ if(reviewing)await history();updateCount();
  }catch(e){say(e.message)}})();
