@@ -18,7 +18,7 @@ if(!indicators.length)throw new Error("Empty catalog");
 const list=name=>JSON.parse(source.match(new RegExp("^"+name+" = (\\[.*\\])$","m"))[1]);
 const catalog={indicators,ages:list("AGES"),communities:list("COMMUNITIES"),activities:JSON.parse(source.split("ACTIVITIES = ")[1].trim().replace(/,\s*}/g,"}")),warning:"DEMOSTRACIÓN VISUAL · Metas de referencia; sin registros reales ni resultados de ejecución."};
 await writeFile(out+"/intelligence/sandbox-data.js","window.HH_SANDBOX_CATALOG="+JSON.stringify(catalog)+";\n");
-for(const [src,dst] of [["index.html","index.html"],["educo.html","educo.html"],["attendance.html","asistencia.html"]]){
+for(const [src,dst] of [["index.html","intelligence.html"],["educo.html","mera-legacy.html"],["attendance.html","asistencia.html"]]){
  let html=await readFile("intelligence/"+src,"utf8");
  html=html.replace("</head>",'<script src="/intelligence/sandbox-data.js" defer></script><script src="/intelligence/sandbox.js" defer></script><link rel="stylesheet" href="/intelligence/sandbox.css"></head>');
  // Load the read-only adapter before the application scripts.
@@ -31,4 +31,7 @@ for(const file of ["app.js","educo.js","attendance.js","style.css","educo.css"])
 await copyFile("intelligence/style.css",out+"/intelligence/attendance-style.css");
 await copyFile("intelligence/educo.css",out+"/intelligence/attendance-extra.css");
 for(const file of ["sandbox.js","sandbox.css"])await copyFile("preview/"+file,out+"/intelligence/"+file);
+// New pilot portal; the legacy technical screens remain separate.
+await copyFile("preview/portal.html",out+"/index.html");
+for(const f of ["portal.js","portal.css","educo-logo.svg"])await copyFile("preview/"+f,out+"/intelligence/"+f);
 console.log("Static HumanHub preview built: "+indicators.length+" indicators; no backend, no credentials, no data writes.");
