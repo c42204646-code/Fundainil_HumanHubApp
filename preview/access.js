@@ -1,7 +1,7 @@
 "use strict";
 // Only the publishable key may be present in browser source. Access token stays in memory.
 const BASE="https://wakitroyztkypiadasyh.supabase.co", KEY="sb_publishable_tqWlxKplCrx01YR7j61FJw_Gku8Tsg6";
-let accessToken=null,expiryTimer=null,authEpoch=0,projects=[];
+let accessToken=null,expiryTimer=null,authEpoch=0,projects=[],panelEpoch=0;
 const $=id=>document.getElementById(id);
 const message=t=>{$("message").textContent=t};
 const node=(tag,t,cls)=>{const e=document.createElement(tag);if(t!=null)e.textContent=t;if(cls)e.className=cls;return e};
@@ -14,8 +14,8 @@ async function api(path,method="GET",payload,token=accessToken){
  return res.status===204?null:await res.json();
 }
 function reset(text){
- authEpoch++;accessToken=null;projects=[];clearTimeout(expiryTimer);
- $("workspace").hidden=true;$("signin").hidden=false;$("projects").replaceChildren();$("catalog-content").replaceChildren();$("catalog").hidden=true;$("password").value="";$("login").disabled=false;
+ authEpoch++;panelEpoch++;accessToken=null;projects=[];clearTimeout(expiryTimer);
+ if($("pilot-panel"))$("pilot-panel").replaceChildren();$("workspace").hidden=true;$("signin").hidden=false;$("projects").replaceChildren();$("catalog-content").replaceChildren();$("catalog").hidden=true;$("password").value="";$("login").disabled=false;
  message(text??"");
 }
 function renderProjects(){
@@ -23,8 +23,8 @@ function renderProjects(){
  for(const p of projects){
   const box=node("section",null,"card");box.append(node("h2",p.project_name),node("p","Rol asignado: "+({field:"Campo",coordinator:"Coordinación",monitoring:"MERA",manager:"Gerencia",director:"Dirección",auditor:"Auditoría"}[p.member_role]??"No reconocido")));
   const grid=node("div",null,"grid three");
-  for(const [allowed,label] of [[p.field_access,"Reporte de campo"],[p.coord_access,"Coordinación"],[p.mera_access,"MERA"]]){
-   const card=node("div",null,"tile");card.append(node("h3",label),node("p",allowed?"Rol autorizado · funciones operativas pendientes":"Sin permiso para este módulo"),node("span",allowed?"Autorizado":"Restringido","tag "+(allowed?"green":"orange")));grid.append(card);
+  for(const [allowed,label,mode] of [[p.field_access,"Reporte de campo","field"],[p.coord_access,"Coordinación","coord"],[p.mera_access,"MERA","mera"]]){
+   const card=node("div",null,"tile");card.append(node("h3",label),node("p",allowed?"Rol autorizado · circuito de pruebas":"Sin permiso para este módulo"),node("span",allowed?"Autorizado":"Restringido","tag "+(allowed?"green":"orange")));if(allowed&&p.project_code==="EDUCO-SANDBOX"){const b=node("button","Abrir módulo","btn");b.type="button";b.onclick=()=>openPilot(p.project_id,mode);card.append(b)}grid.append(card);
   }
   box.append(grid);
   const b=node("button","Consultar catálogo en Supabase","btn secondary");b.type="button";b.addEventListener("click",()=>readCatalog(p.project_id));box.append(b);container.append(box);
@@ -47,6 +47,82 @@ async function readCatalog(projectId){
   $("catalog-content").replaceChildren(node("p",rows.length+" definiciones consultadas en la base de datos."),table);$("catalog").hidden=false;message("Consulta completada.");
  }catch(e){if(epoch===authEpoch)reset("No se pudo verificar el acceso. Inicia sesión nuevamente.")}
 }
+
+const rpc=(name,payload)=>api("/rest/v1/rpc/"+name,"POST",payload);
+function dateLocal(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
+function fieldControl(label,type,opts=[]){
+ const l=node("label",label),e=node(type==="select"?"select":type==="textarea"?"textarea":"input");
+ if(type==="select"){for(const [v,t] of opts){const o=node("option",t);o.value=v;e.append(o)}}
+ else if(type!=="textarea")e.type=type;
+ if(type==="textarea")e.maxLength=1000;
+ l.append(e);return {l,e};
+}
+function dataTable(headers,rows){
+ const t=node("table"),head=node("thead"),h=node("tr"),body=node("tbody");
+ headers.forEach(x=>h.append(node("th",x)));head.append(h);t.append(head,body);
+ rows.forEach(row=>{const r=node("tr");row.forEach(x=>{const c=node("td");if(x instanceof Node)c.append(x);else c.textContent=String(x??"");r.append(c)});body.append(r)});
+ const wrap=node("div",null,"scroll");wrap.append(t);return wrap;
+}
+async function openPilot(project,mode){
+ const epoch=authEpoch,pe=++panelEpoch,panel=$("pilot-panel");if(!accessToken)return;
+ const alive=()=>epoch===authEpoch&&pe===panelEpoch&&!!accessToken;
+ panel.replaceChildren(node("p","Cargando módulo…","status"));$("catalog").hidden=true;
+ try{
+  const access=await rpc("hh_my_access",{});if(!alive())return;
+  const member=access.find(p=>p.project_id===project&&p.project_code==="EDUCO-SANDBOX");
+  if(!member||!({field:member.field_access,coord:member.coord_access,mera:member.mera_access}[mode])){panel.replaceChildren(node("p","No tienes acceso activo a este módulo.","notice"));return}
+  const section=node("section",null,"card"),output=node("div"),status=node("p",null,"status");
+  section.append(node("h2",({field:"Reporte de campo · prueba persistente",coord:"Coordinación · revisión de reportes",mera:"MERA · sesiones validadas"})[mode]),node("p","SOLO PRUEBAS FICTICIAS. No ingreses nombres, listas, fotografías ni información real de participantes.","notice"));
+  panel.replaceChildren(section);
+  async function listReports(){
+   const data=await rpc("hh_pilot_reports",{p_project:project});if(!alive())return;
+   output.replaceChildren(node("h3",mode==="field"?"Mis reportes / reportes autorizados":"Reportes recibidos"));
+   if(!data.length){output.append(node("p","No hay reportes registrados.","empty"));return}
+   const rows=data.map(r=>{
+    const detail=node("div");detail.append(node("p",r.strategy),node("p","Resultado: "+(r.achievements||"No informado")),node("p","Dificultades: "+(r.challenges||"No informadas")),node("p","Revisión: "+(r.review_note||"Sin observaciones")));
+    const ctl=node("div");
+    if(mode==="coord"&&r.can_review){
+     const note=fieldControl("Observación de revisión (ficticia)","textarea");ctl.append(note.l);
+     for(const [decision,label] of [["validated","Validar"],["returned","Devolver"]]){
+      const b=node("button",label,decision==="validated"?"btn green":"btn secondary");b.type="button";
+      b.onclick=async()=>{if(decision==="returned"&&!note.e.value.trim()){status.textContent="Indica el motivo de devolución.";return}if(!confirm("¿Confirmar "+label.toLowerCase()+" este reporte de prueba?"))return;b.disabled=true;try{await rpc("hh_pilot_review",{p_project:project,p_report:r.report_id,p_decision:decision,p_note:note.e.value});if(alive()){status.textContent="Revisión registrada en Supabase.";await listReports()}}catch{if(alive()){status.textContent="No fue posible registrar la revisión.";b.disabled=false}}};
+      ctl.append(b);
+     }
+    }else ctl.textContent=r.own_report?"Reporte propio":"Sin acción disponible";
+    return [r.day,r.program_code,r.logical_code,r.phase,({review:"Pendiente",validated:"Validado",returned:"Devuelto"})[r.state]??r.state,detail,ctl];
+   });
+   output.append(dataTable(["Fecha","Programa","Actividad","Fase","Estado","Detalle","Acción"],rows));
+  }
+  if(mode==="field"){
+   const opts=await rpc("hh_pilot_options",{p_project:project});if(!alive())return;
+   if(!opts.length){section.append(node("p","Catálogo no disponible.","notice"));return}
+   const form=node("form"),grid=node("div",null,"grid");
+   const activity=fieldControl("Actividad / fase del catálogo de prueba","select",opts.map((o,i)=>[String(i),o.program_label+" · "+o.logical_code+" · "+o.activity_label+" ("+o.phase+")"]));
+   const day=fieldControl("Fecha","date");day.e.value=dateLocal();day.e.max=dateLocal();day.e.required=true;
+   const shift=fieldControl("Turno","select",[["AM","Mañana"],["PM","Tarde"]]);
+   const slot=fieldControl("Sesión del turno (1–20)","number");slot.e.min="1";slot.e.max="20";slot.e.value="1";slot.e.required=true;
+   const strategy=fieldControl("Estrategia ficticia","textarea");strategy.e.required=true;
+   const outcome=fieldControl("Resultado ficticio observado","textarea"),challenges=fieldControl("Dificultades ficticias","textarea");
+   const consent=node("label",null,"check"),check=node("input");check.type="checkbox";check.required=true;consent.append(check,document.createTextNode(" Confirmo que todos los datos son inventados para la prueba."));
+   grid.append(activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
+   const button=node("button","Enviar reporte a revisión","btn wide");button.type="submit";
+   form.append(node("p",opts[0].space_label),grid,consent,button);
+   form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];button.disabled=true;try{await rpc("hh_pilot_submit",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value});if(alive()){strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
+   section.append(form,status,output);await listReports();
+  }else if(mode==="coord"){section.append(status,output);await listReports()}
+  else{
+   const filters=node("div",null,"grid"),from=fieldControl("Desde","date"),to=fieldControl("Hasta","date");to.e.value=dateLocal();from.e.value=to.e.value.slice(0,8)+"01";const b=node("button","Consultar resultados validados","btn");b.type="button";filters.append(from.l,to.l);section.append(filters,b,status,output);
+   async function load(){if(!from.e.value||!to.e.value||from.e.value>to.e.value){status.textContent="Selecciona un período válido.";return}b.disabled=true;try{
+    const rows=await rpc("hh_pilot_mera",{p_project:project,p_from:from.e.value,p_to:to.e.value});if(!alive())return;
+    output.replaceChildren(node("p","Sesiones de prueba validadas en el período: "+rows.reduce((n,r)=>n+Number(r.validated_period),0)),dataTable(["Programa","Actividad","Código","Fase","Meta","Período","Acumulado"],rows.map(r=>[r.program_code,r.activity_key,r.logical_code,r.phase,"N/D",r.validated_period,r.validated_accumulated])));
+    status.textContent=rows.length?"Resultados consultados en PostgreSQL.":"No hay sesiones de prueba aprobadas para el corte.";
+   }catch{if(alive())status.textContent="No se pudo consultar el agregado autorizado."}finally{if(alive())b.disabled=false}}
+   b.onclick=load;await load();
+  }
+  if(alive())panel.scrollIntoView({block:"start",behavior:"smooth"});
+ }catch(e){if(alive())panel.replaceChildren(node("p","No se pudo cargar el módulo autorizado. Verifica la sesión.","notice"))}
+}
+
 $("login-form").addEventListener("submit",async e=>{
  e.preventDefault();const epoch=++authEpoch;$("login").disabled=true;message("Verificando credenciales…");
  const email=$("email").value.trim(),password=$("password").value;$("password").value="";
