@@ -1,0 +1,232 @@
+"use strict";
+const root=document.getElementById("app"),cat=window.HH_SANDBOX_CATALOG;
+const $=id=>document.getElementById(id);
+const esc=x=>String(x??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"})[c]);
+const option=(v,l=v)=>'<option value="'+esc(v)+'">'+esc(l)+'</option>';
+const options=items=>items.map(x=>Array.isArray(x)?option(...x):option(x)).join("");
+const select=(id,label,items,blank=true)=>'<label>'+esc(label)+'<select id="'+id+'">'+(blank?option("","Seleccionar…"):"")+options(items)+'</select></label>';
+const input=(id,label,type="text")=>'<label>'+esc(label)+'<input id="'+id+'" type="'+type+'" autocomplete="off"></label>';
+const area=(id,label,placeholder="")=>'<label class="full">'+esc(label)+'<textarea id="'+id+'" placeholder="'+esc(placeholder)+'"></textarea></label>';
+const card=(title,body)=>'<section class="card"><h2>'+title+'</h2>'+body+'</section>';
+const back='<a class="back no-print" href="/demo/educo">← Volver al proyecto Educo</a>';
+const notice='<div class="notice no-print"><strong>Ambiente de demostración.</strong> Utiliza exclusivamente información ficticia. No hay autenticación de usuarios, persistencia, OCR ni IA activos en esta versión; las entradas se mantienen solo durante esta visita.</div>';
+const title=(name,desc)=>'<div class="page-heading"><div><h1>'+name+'</h1><p>'+desc+'</p></div><span class="tag orange">Vista de prueba</span></div>';
+const nav=active=>'<nav class="scope no-print">'+[["campo","Reporte de campo"],["coordinacion","Coordinación"],["mera","MERA"]].map(([p,l])=>'<a class="'+(p===active?"active":"")+'" href="/demo/educo/'+p+'">'+l+'</a>').join("")+'</nav>';
+const values=ids=>Object.fromEntries(ids.map(id=>[id,$(id)?.value??""]));
+const sectors=["Educación","Protección","WASH","Logística","Otros"];
+const geography={"Naiguatá":["La Guaira","Vargas"],"Caraballeda":["La Guaira","Vargas"],"Caucaguita":["Miranda","Sucre"],"Caricuao":["Distrito Capital","Libertador"]};
+// Caucaguita requires operational confirmation of municipality; use only the confirmed project's catalog.
+const activityMap=[
+ ["original","A1.1","Apoyo psicosocial grupal","Protección","ps_group"],
+ ["original","A1.2","Atención individual / PAP","Protección","pap"],
+ ["original","A1.3","Prevención de violencia y crianza","Protección","violence"],
+ ["original","A1.4","Puntos WASH funcionales","WASH","wash_points"],
+ ["original","A1.5","Promoción de higiene","WASH","hygiene"],
+ ["original","A2.1","Habilitación de espacios de apoyo","Educación","eta"],
+ ["original","A2.2","Distribución de kits","Educación","school_kits"],
+ ["original","A2.3","Nivelación educativa","Educación","education_sessions"],
+ ["original","A2.4","Aprendizaje socioemocional","Educación","sel"],
+ ["original","A2.5","Formación / autocuidado de facilitadores","Educación","facilitators"],
+ ["expansion","O1.01","Apoyo psicosocial individual y grupal","Protección","ps_sessions"],
+ ["expansion","O1.02","Prevención de violencias y orientación familiar","Protección","violence"],
+ ["expansion","O1.02","Promoción WASH","WASH","hygiene"],
+ ["expansion","O1.03","Formación de líderes y voluntarios","Protección","leaders"],
+ ["expansion","O2.01","Preparación pedagógica y funcionamiento de espacios","Educación","fixed"],
+ ["expansion","O2.02","Distribución focalizada de kits escolares","Educación","school_kits"],
+ ["expansion","O2.02","Distribución focalizada de kits de higiene menstrual","WASH","menstrual_kits"],
+ ["expansion","O2.03","Jornadas educativas y recuperación de aprendizajes","Educación","education_sessions"],
+ ["expansion","O2.04","Capacitación, autocuidado y coordinación técnica","Educación","selfcare"],
+ ["expansion","LOG.01","Despliegues logísticos y atención territorial","Logística","trips"],
+ ["expansion","LOG.02","Materiales generales y apoyo logístico","Logística",null],
+ ["expansion","SEG.01","Registro y monitoreo de participantes","Otros",null],
+ ["expansion","SEG.02","Participación y rendición de cuentas","Protección",null]
+].map(([phase,code,label,sector,indicator],i)=>({phase,code,label,sector,indicator,id:String(i)})).filter(a=>cat.activities[a.phase].includes(a.code));
+const linkedIndicators={
+ education_sessions:["education","coverage","education_sessions","sio1","academic_sel"],sel:["education","coverage","sel","academic_sel","sio1"],ps_sessions:["psychosocial","coverage","ps_sessions","wellbeing","sio2"],ps_group:["psychosocial","ps_sessions","ps_group","wellbeing"],pap:["psychosocial","ps_sessions","pap","case_route"],violence:["violence","caregivers","women","risk_knowledge"],hygiene:["hygiene","safe_water"],leaders:["leaders","women_leaders"],fixed:["fixed","route_rate"],school_kits:["school_kits"],menstrual_kits:["menstrual_kits"],facilitators:["facilitators","selfcare"]
+};
+function linked(a){return cat.indicators.filter(i=>(linkedIndicators[a?.indicator]??[a?.indicator]).includes(i.id))}
+const phaseNames={original:"Proyecto original · VE3501",expansion:"Ampliación · propuesta",operational:"Plan operativo · referencia"};
+const phaseOptions=()=>Object.entries(phaseNames);
+const participants=Array.from({length:12},(_,i)=>({id:"DEMO-"+String(i+1).padStart(3,"0"),age:[6,8,10,12,13,14,15,9,5,7,11,16][i],sex:i%2?"M":"F",disability:["no","yes","no","unknown","no","no","yes","unknown","no","yes","no","unknown"][i]}));
+const byId=new Map(participants.map(p=>[p.id,p]));
+const personRows=(ids)=>ids.map(id=>byId.get(id)).filter(Boolean);
+const unique=xs=>[...new Set(xs)];
+const activities= [
+ {id:"D01",day:"2026-11-25",community:"Naiguatá",phase:"expansion",sector:"Educación",code:"O2.03",name:"Jornadas educativas",staff:"Profesional demo 01",people:[0,1,2,3,4,5],state:"validated",strategy:"Lectura guiada y trabajo en parejas.",outcome:"Participación observada en ejercicios de lectura.",indicator:"education_sessions"},
+ {id:"D02",day:"2026-11-25",community:"Naiguatá",phase:"expansion",sector:"Protección",code:"O1.01",name:"Apoyo psicosocial",staff:"Profesional demo 02",people:[0,1,3,6,7],state:"validated",strategy:"Dinámica grupal de reconocimiento de emociones.",outcome:"Participación en la dinámica; no se midió cambio de bienestar.",indicator:"ps_sessions"},
+ {id:"D03",day:"2026-11-27",community:"Caraballeda",phase:"expansion",sector:"WASH",code:"O1.02",name:"Promoción WASH",staff:"Profesional demo 03",people:[8,9,10,11],state:"review",strategy:"Demostración de higiene de manos.",outcome:"Pendiente de revisión.",indicator:"hygiene"},
+ {id:"D04",day:"2026-11-28",community:"Naiguatá",phase:"expansion",sector:"Educación",code:"O2.03",name:"Recuperación de aprendizajes",staff:"Profesional demo 01",people:[0,2,4,6,7],state:"validated",strategy:"Resolución de ejercicios por estaciones.",outcome:"Ejercicios completados; no hay evaluación pre/post.",indicator:"education_sessions"},
+ {id:"D05",day:"2026-11-29",community:"Caraballeda",phase:"expansion",sector:"WASH",code:"O1.02",name:"Promoción WASH",staff:"Profesional demo 03",people:[0,6,8,9],state:"validated",strategy:"Demostración ficticia de lavado de manos.",outcome:"Sesión de ejemplo; no hay medición de hábitos.",indicator:"hygiene"},
+ {id:"D06",day:"2026-11-30",community:"Caricuao",phase:"expansion",sector:"Educación",code:"O2.03",name:"Refuerzo educativo",staff:"Profesional demo 04",people:[2,8,10,11],state:"validated",strategy:"Ejercicio ficticio de lectura.",outcome:"Actividad de ejemplo; no hay medición pre/post.",indicator:"education_sessions"}
+].map(r=>({...r,people:r.people.map(i=>participants[i].id)}));
+const validRows=rows=>rows.filter(r=>r.state==="validated");
+const distinctPeople=rows=>unique(rows.flatMap(r=>r.people));
+const countVisits=rows=>rows.reduce((n,r)=>n+r.people.length,0);
+const sexAge=(people)=>{let ranges=["3-5","6-9","10-13","14-17","18","Sin información"];return ranges.map(age=>{const matching=people.filter(p=>{if(age==="Sin información")return p.age==null||p.age<3||p.age>18;const [a,b=a]=age.split("-").map(Number);return p.age!=null&&p.age>=a&&p.age<=b});return [age,matching.filter(p=>p.sex==="F").length,matching.filter(p=>p.sex==="M").length,matching.filter(p=>!["F","M"].includes(p.sex)).length,matching.length]})};
+const table=(headers,rows)=>'<div class="scroll"><table><thead><tr>'+headers.map(h=>'<th>'+esc(h)+'</th>').join("")+'</tr></thead><tbody>'+rows.map(r=>'<tr>'+r.map(c=>'<td>'+esc(c)+'</td>').join("")+'</tr>').join("")+'</tbody></table></div>';
+const metric=(t,v,d)=>'<div class="metric"><small>'+esc(t)+'</small><strong>'+esc(v)+'</strong><small>'+esc(d)+'</small></div>';
+const bar=(label,n,max)=>'<div class="bar-row"><span>'+esc(label)+'</span><div class="bar-track"><meter min="0" max="'+Math.max(1,max)+'" value="'+n+'">'+n+'</meter></div><strong>'+n+'</strong></div>';
+function home(){root.innerHTML='<div class="welcome"><h1>¿En qué proyecto vamos a trabajar hoy?</h1><p>Selecciona el proyecto para acceder a sus herramientas de gestión.</p></div><div class="project-grid"><a class="tile project-tile" href="/demo/educo"><img class="educo-logo" src="/intelligence/educo-logo.svg" alt="Educo"><p>Acceder al proyecto →</p></a></div><p class="banner">Ambiente de demostración · no introducir información real.</p>'}
+function educo(){root.innerHTML='<a class="back" href="/demo">← Volver a proyectos</a><div class="welcome"><img class="educo-logo" src="/intelligence/educo-logo.svg" alt="Educo"><h1>¿Qué deseas realizar?</h1><p>Selecciona tu área de trabajo.</p></div><div class="project-grid">'+[["campo","✎","Reporte de campo","Registro diario de actividades y participantes"],["coordinacion","▤","Coordinación","Supervisión, validación e informes"],["mera","▥","MERA","Monitoreo de metas y resultados"]].map(([p,i,t,d])=>'<a class="tile" href="/demo/educo/'+p+'"><span class="symbol">'+i+'</span><h2>'+t+'</h2><p>'+d+'</p><span class="tag">Acceso por rol · demostración</span></a>').join("")+'</div>'+notice}
+
+/* Two optional activity-evidence photos. Re-encode in memory; do not keep original files or metadata. */
+function evidencePicker(container){
+ const doc=document, rows=[null,null], states=[], pending=[false,false];
+ const el=(tag,text,cls)=>{const e=doc.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e};
+ const grid=el("div",null,"grid"),notice=el("p","Solo imágenes de prueba, sin rostros, listas, nombres ni información personal. Máximo dos fotos JPEG, PNG o WebP. Cada imagen requiere una descripción.","section-caption");container.append(notice,grid);
+ const encode=async file=>{
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>10*1024*1024)throw Error("Formato no admitido o archivo superior a 10 MB.");
+  const url=URL.createObjectURL(file);
+  try{
+   const img=new Image();img.src=url;await img.decode();
+   if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>40000000)throw Error("Imagen demasiado grande.");
+   const canvas=doc.createElement("canvas");let scale=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
+   for(let i=0;i<5;i++){
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    const data=canvas.toDataURL("image/jpeg",0.75);
+    if(data.startsWith("data:image/jpeg;base64,")&&data.length<=349000)return data;
+    scale*=0.75;
+   }
+   throw Error("No se pudo reducir la imagen.");
+  }finally{URL.revokeObjectURL(url)}
+ };
+ for(let i=0;i<2;i++){
+  let epoch=0;const box=el("div",null,"upload evidence-slot"),img=el("img",null,"evidence-preview"),caption=el("input"),msg=el("p",null,"section-caption"),buttons=el("div",null,"actions");
+  img.alt="Vista previa de evidencia "+(i+1);img.hidden=true;caption.placeholder="Descripción breve de la actividad";caption.maxLength=240;caption.setAttribute("aria-label","Descripción de foto "+(i+1));caption.hidden=true;
+  const camera=el("input"),gallery=el("input");for(const inp of [camera,gallery]){inp.type="file";inp.accept="image/jpeg,image/png,image/webp";inp.hidden=true}camera.setAttribute("capture","environment");
+  const pick=(text,inp)=>{const b=el("button",text,"btn secondary");b.type="button";b.onclick=()=>inp.click();return b};
+  const clear=el("button","Quitar foto","btn secondary");clear.type="button";clear.hidden=true;
+  const reset=()=>{epoch++;pending[i]=false;rows[i]=null;img.removeAttribute("src");img.hidden=true;caption.value="";caption.hidden=true;clear.hidden=true;msg.textContent="";camera.value=gallery.value=""};
+  clear.onclick=reset;
+  const load=async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;reset();const request=++epoch;pending[i]=true;msg.textContent="Preparando fotografía…";try{const data=await encode(file);if(request!==epoch)return;rows[i]=data;img.src=data;img.hidden=false;caption.hidden=false;clear.hidden=false;msg.textContent="Foto lista. Añade una descripción."}catch(err){if(request===epoch)msg.textContent=err.message||"No se pudo leer la foto."}finally{if(request===epoch)pending[i]=false}};
+  camera.onchange=gallery.onchange=load;
+  buttons.append(pick("Tomar foto",camera),pick("Adjuntar",gallery),clear);
+  box.append(el("strong","Evidencia "+(i+1)),img,caption,buttons,camera,gallery,msg);grid.append(box);states.push({caption,reset});
+ }
+ return {clear:()=>states.forEach(s=>s.reset()),get:()=>{if(pending.some(Boolean))throw Error("Espera a que las fotografías estén listas.");return rows.flatMap((data,i)=>{if(!data)return [];const caption=states[i].caption.value.trim();if(!caption)throw Error("Añade una descripción a cada fotografía.");return [{jpeg:data.split(",")[1],caption}]})}};
+}
+async function appendEvidence(doc,photos){
+ if(!photos.length)return;
+ const h=document.createElement("h2");h.textContent="Evidencias fotográficas";doc.append(h);
+ for(const p of photos){const figure=document.createElement("figure"),img=document.createElement("img"),cap=document.createElement("figcaption");figure.className="evidence-figure";img.src="data:image/jpeg;base64,"+(p.jpeg??p.jpeg_base64);img.alt=p.caption;cap.textContent=p.caption;figure.append(img,cap);doc.append(figure);try{await img.decode()}catch{img.remove();cap.textContent+=" (imagen no disponible)"}}
+}
+
+function field(){
+ root.innerHTML=back+nav("campo")+title("Registro diario de actividad","Educo · Reporte de campo")+notice+'<div class="form-wrap">'+
+ card("01. Información general y ubicación",'<div class="grid">'+select("staff","Profesional",["Profesional demo 01","Profesional demo 02","Profesional demo 03","Profesional demo 04","Profesional demo 05","Profesional demo 06"])+input("day","Fecha","date")+select("community","Comunidad",cat.communities)+input("state","Estado")+input("municipality","Municipio (confirmar en terreno)")+select("modality","Modalidad",["Fija","Itinerante","Integrada"])+input("space","Código de espacio (ficticio)")+select("shift","Turno",["AM","PM"])+'</div>')+
+ card("02. Actividad y contribución a las metas",'<div class="grid">'+select("phase","Fase del proyecto",phaseOptions().filter(x=>x[0]!=="operational"))+select("activity","Actividad del marco lógico",[])+input("sector","Área de intervención")+'<div id="goal" class="notice">Selecciona una actividad para consultar su indicador de referencia.</div>'+area("strategy","Estrategia aplicada","Describe la metodología y las dinámicas utilizadas.")+area("contribution","Contribución observada a la meta","Explica qué resultados se observaron. No atribuyas cambios sin evidencia.")+'</div>')+
+ card("03. Enfoques transversales y vulnerabilidades",'<div class="checks">'+["Género y equidad","Inclusión y discapacidad","Protección y salvaguarda","Participación de NNA","Rendición de cuentas","No discriminación"].map((t,i)=>'<label class="check"><input type="checkbox" name="transversal" value="'+i+'">'+t+'</label>').join("")+'</div><p class="section-caption">Solo cantidades agregadas verificadas; no registrar casos ni diagnósticos.</p><div class="grid">'+input("disability","Participantes con discapacidad · cantidad","number")+input("displacement","Participantes desplazados · cantidad","number")+'</div>')+
+ card("04. Listado de participantes",'<div class="grid"><div class="upload"><strong>📷 Tomar fotografía</strong><p>OCR y salvaguarda pendientes de integración</p><button disabled class="btn secondary">Cámara desactivada</button></div><div class="upload"><strong>Adjuntar lista</strong><p>No se aceptan listas reales en este entorno</p><button disabled class="btn secondary">Adjuntar desactivado</button></div></div><div class="actions"><button class="btn secondary" id="load-example">Cargar lista ficticia de prueba</button><button class="btn secondary" id="clear-example">Limpiar</button></div><div id="list"></div><label class="check"><input type="checkbox" id="check-list"> He revisado los códigos, edades y desagregación de la lista de ejemplo.</label><p id="list-message" class="section-caption"></p>')+
+ card("05. Análisis cualitativo",'<div class="grid">'+select("reception","Receptividad",["Alta","Media","Baja","No evaluada"])+area("achievements","Logros observados","Describe hechos comprobables.")+area("challenges","Dificultades o nudos críticos")+area("recommendations","Recomendaciones y próximos pasos")+'</div>')+
+ card("06. Evidencias fotográficas",'<div id="field-evidence"></div>')+
+ card("07. Informe diario",'<div class="narrative"><p><strong>ATLAS · Vista de redacción</strong></p><p class="section-caption">Generación local mediante plantilla de demostración. La IA real todavía no está habilitada.</p><div class="actions no-print"><button class="btn" id="draft">Generar borrador</button><button class="btn secondary" id="pdf">Imprimir / Guardar PDF</button></div><label>Borrador editable<textarea id="report"></textarea></label></div><p class="section-caption">El envío y la aprobación reales estarán disponibles cuando se activen usuarios y Supabase.</p><button class="btn wide" disabled>Enviar a coordinación · pendiente de integración</button><p class="status" id="field-status" aria-live="polite"></p>')+'</div>';
+ const picker=evidencePicker($("field-evidence"));
+ const f=$("phase"),a=$("activity");$("state").readOnly=true;$("sector").readOnly=true;$("municipality").readOnly=true;
+ $("community").onchange=()=>{let g=geography[$("community").value];$("state").value=g?.[0]??"";$("municipality").value=g?.[1]??"";if($("community").value==="Caucaguita")$("municipality").value="Por confirmar"};
+ const updateGoal=()=>{let x=activityMap.find(x=>x.id===a.value);$("sector").value=x?.sector??"";const goals=linked(x);$("goal").textContent=goals.length?"Indicadores de referencia: "+goals.map(i=>i.label+" ("+(i[f.value]==null?"meta N/D":i[f.value]+(i.kind==="rate"?"%":""))+")").join(" · ")+". Los resultados se acreditan únicamente con la evidencia correspondiente.":"Sin indicador directo cuantificado. Revisar vínculo antes de aprobar."};
+ f.onchange=()=>{a.innerHTML=option("","Seleccionar…")+options(activityMap.filter(x=>x.phase===f.value).map(x=>[x.id,x.code+" · "+x.label]));updateGoal()};a.onchange=updateGoal;
+ let rows=[],repeated=0;
+ function drawList(){let ids=unique(rows),people=personRows(ids);repeated=rows.length-ids.length;$("check-list").checked=false;$("list").innerHTML=rows.length?table(["Código de prueba","Edad","Sexo registrado"],people.map(p=>[p.id,p.age,p.sex]))+'<h3>Desagregación automática · lista ficticia</h3>'+table(["Edad","F","M","Sin dato","Total"],sexAge(people).concat([["TOTAL",people.filter(p=>p.sex==="F").length,people.filter(p=>p.sex==="M").length,0,people.length]])):'<p class="empty">No se ha cargado una lista de ejemplo.</p>';$("list-message").textContent=rows.length?rows.length+" filas · "+people.length+" personas distintas · "+repeated+" fila(s) repetida(s) excluida(s).":""}
+ $("load-example").onclick=()=>{rows=participants.slice(0,8).map(p=>p.id).concat(participants[0].id);drawList()};
+ $("clear-example").onclick=()=>{rows=[];drawList()};drawList();
+ $("draft").onclick=()=>{const v=values(["staff","day","community","shift","modality","strategy","contribution","reception","achievements","challenges","recommendations"]);let x=activityMap.find(x=>x.id===a.value);if(!v.staff||!v.day||!v.community||!x||!v.strategy.trim()||!rows.length||!$("check-list").checked){$("field-status").textContent="Completa los datos esenciales y valida la lista ficticia antes de redactar.";return}let i=cat.indicators.find(i=>i.id===x.indicator),m=i?.[x.phase];$("report").value=["INFORME DIARIO · EJEMPLO FICTICIO",v.day+" · "+v.community+" · "+v.staff,"Actividad: "+x.code+" "+x.label,"Estrategia: "+v.strategy,"Alcance registrado: "+unique(rows).length+" participantes distintos en esta sesión; "+repeated+" fila(s) repetida(s) excluida(s). No representa alcance acumulado del proyecto.","Metas de referencia: "+(linked(x).map(g=>g.label+" — "+(g[x.phase]==null?"sin meta cuantificada":g[x.phase]+(g.kind==="rate"?"%":""))).join("; ")||"pendiente de asociación"),"Contribución descrita: "+(v.contribution||"No informada"),"Receptividad: "+(v.reception||"No informada"),"Logros: "+(v.achievements||"No informados"),"Dificultades: "+(v.challenges||"No informadas"),"Próximos pasos: "+(v.recommendations||"No informados"),"Pendiente de revisión. No se han inferido cambios de bienestar ni aprendizaje."].join("\n\n");$("field-status").textContent="Borrador local generado; no se ha enviado ni almacenado."};
+ $("pdf").onclick=async()=>{if(!$("report").value.trim()){$("field-status").textContent="Genera primero el borrador.";return}try{await printReport("report",picker.get())}catch(err){$("field-status").textContent=err.message}};
+}
+function filters(mode){
+ return card("Filtros de seguimiento",'<div class="grid four">'+input("from","Desde","date")+input("to","Hasta","date")+select("community","Comunidad",cat.communities)+select("sector","Área de intervención",sectors)+select("phase","Fase",phaseOptions(),mode==="coord")+(mode==="coord"?select("staff","Profesional",unique(activities.map(r=>r.staff)))+select("status-filter","Estado",[["validated","Validado"],["review","Pendiente"]]):"")+'</div><div class="actions"><button id="reset" class="btn secondary">Restablecer filtros</button></div><p id="filter-error" class="status"></p>');
+}
+function filtered(includeDate=true){let v=values(["from","to","community","sector","phase","staff","status-filter"]);if(v.from&&v.to&&v.from>v.to)return [];return activities.filter(r=>(!includeDate||!v.from||r.day>=v.from)&&(!v.to||r.day<=v.to)&&(!v.community||r.community===v.community)&&(!v.sector||r.sector===v.sector)&&(!v.phase||v.phase==="operational"||r.phase===v.phase)&&(!v.staff||r.staff===v.staff)&&(!v["status-filter"]||r.state===v["status-filter"]))}
+function wireFilters(render){$("from").value="2026-11-25";$("to").value="2026-11-30";$("phase").value="expansion";for(const id of ["from","to","community","sector","phase","staff","status-filter"])$(id)?.addEventListener("change",()=>{if($("from").value>$("to").value&&$("to").value){$("filter-error").textContent="La fecha inicial debe ser anterior a la final."}else{$("filter-error").textContent=""}render()});$("reset").onclick=()=>{for(const id of ["community","sector","staff","status-filter"])if($(id))$(id).value="";$("phase").value="expansion";$("from").value="2026-11-25";$("to").value="2026-11-30";$("filter-error").textContent="";render()};render()}
+function coordination(){root.innerHTML=back+nav("coordinacion")+title("Centro de coordinación","Supervisión de actividades, responsables y contribución a resultados")+notice+filters("coord")+'<div id="coord-dash"></div>'+card("Informe consolidado · ATLAS",'<div class="grid">'+area("coordinator-comments","Comentarios de coordinación","Observaciones, decisiones y acciones de seguimiento.")+'</div><div class="narrative"><p class="section-caption">Borrador local basado en los registros ficticios validados y filtros seleccionados. No es una respuesta de IA.</p><div class="actions no-print"><button class="btn" id="coord-draft">Generar informe consolidado</button><button class="btn secondary" id="coord-pdf">Imprimir / Guardar PDF</button></div><label>Narrativa editable<textarea id="coord-report"></textarea></label></div>');
+ const render=()=>{let rows=filtered(),v=validRows(rows),people=distinctPeople(v),visits=countVisits(v);$("coord-dash").innerHTML='<div class="metrics">'+metric("Reportes recibidos",rows.length,"Ejemplo")+metric("Validados",v.length,"Alimentan seguimiento")+metric("Participantes únicos",people.length,"Códigos distintos")+metric("Asistencias",visits,"Participaciones por sesión")+'</div><div class="grid">'+card("Actividades validadas por área",sectors.map(s=>bar(s,v.filter(r=>r.sector===s).length,Math.max(1,v.length))).join(""))+card("Aporte por profesional",table(["Responsable","Reportes validados","Personas únicas","Asistencias"],unique(rows.map(r=>r.staff)).map(s=>[s,v.filter(r=>r.staff===s).length,distinctPeople(v.filter(r=>r.staff===s)).length,countVisits(v.filter(r=>r.staff===s))])))+'</div>'+card("Reportes de actividades",rows.length?'<div class="scroll"><table><thead><tr><th>Fecha / comunidad</th><th>Área / actividad</th><th>Responsable</th><th>Asistencias</th><th>Estado</th><th>Detalle</th></tr></thead><tbody>'+rows.map(r=>'<tr><td>'+esc(r.day)+'<br>'+esc(r.community)+'</td><td>'+esc(r.sector)+'<br>'+esc(r.code+" · "+r.name)+'</td><td>'+esc(r.staff)+'</td><td>'+r.people.length+'</td><td><span class="tag '+(r.state==="validated"?"green":"orange")+'">'+(r.state==="validated"?"Validado":"Pendiente")+'</span></td><td><button class="btn secondary detail" data-id="'+r.id+'">Revisar</button></td></tr>').join("")+'</tbody></table></div><div id="detail"></div>':'<p class="empty">Sin reportes para los filtros seleccionados.</p>')+card("Desagregación de participantes únicos validados",table(["Edad","F","M","Sin dato","Total"],sexAge(personRows(people))));document.querySelectorAll(".detail").forEach(b=>b.onclick=()=>{let r=rows.find(x=>x.id===b.dataset.id);$("detail").innerHTML='<div class="notice"><strong>'+esc(r.code+" · "+r.name)+'</strong><p>'+esc(r.strategy)+'</p><p>'+esc(r.outcome)+'</p><p>Indicador vinculado: '+esc(cat.indicators.find(i=>i.id===r.indicator)?.label??"Por definir")+'</p><button class="btn secondary" disabled>Validar / devolver · integración pendiente</button></div>'})};
+ wireFilters(render);
+ $("coord-draft").onclick=()=>{const v=validRows(filtered()),p=distinctPeople(v),phase=$("phase").value,scoped=$("community").value||$("sector").value||$("staff").value;const goals=phase?cat.indicators.map(i=>({i,value:indicatorValue(i,v)})).filter(x=>x.value!=null).map(({i,value})=>i.label+": "+value+" en período; meta "+(i[phase]==null?"N/D":i[phase])+(scoped?" (meta global, no atribuida a este filtro)":"")):[];$("coord-report").value=["INFORME CONSOLIDADO · DEMOSTRACIÓN FICTICIA",$("from").value+" al "+$("to").value,"Reportes validados: "+v.length+". Participantes únicos: "+p.length+". Asistencias: "+countVisits(v)+".","Desglose: "+sectors.map(s=>s+": "+v.filter(r=>r.sector===s).length+" actividades").join("; "),"Contribución a indicadores: "+(goals.join("; ")||"No hay valores comparables para la selección."),...v.map(r=>r.day+" · "+r.staff+" · "+r.code+" · "+r.strategy+" Resultado observado: "+r.outcome),"Contribución: el alcance y la ejecución permiten examinar el avance operativo. No demuestran por sí solos cambios en competencias o bienestar; los indicadores de resultado requieren instrumentos específicos.","Observaciones de coordinación: "+($("coordinator-comments").value||"No informadas")].join("\n\n")};$("coord-pdf").onclick=()=>{if($("coord-report").value.trim())printReport("coord-report")};
+}
+function indicatorValue(i,rows){let v=validRows(rows);if(i.id==="coverage")return distinctPeople(v.filter(r=>["Educación","Protección"].includes(r.sector))).length||null;if(i.id==="education")return distinctPeople(v.filter(r=>r.indicator==="education_sessions")).length||null;if(i.id==="psychosocial")return distinctPeople(v.filter(r=>r.indicator==="ps_sessions")).length||null;if(i.kind==="event"&&["education_sessions","ps_sessions","hygiene"].includes(i.id)){const found=v.filter(r=>r.indicator===i.id);return found.length||null}return null}
+
+/* MERA exploratory dashboard: only validated fictional records. */
+const ageBand=p=>p.age>=3&&p.age<=5?"3–5":p.age>=6&&p.age<=9?"6–9":p.age>=10&&p.age<=13?"10–13":p.age>=14&&p.age<=17?"14–17":p.age===18?"18":"Sin información";
+const disabilityLabel=p=>({yes:"Con discapacidad",no:"Sin discapacidad",unknown:"Sin información"})[p.disability]??"Sin información";
+const genderLabel=p=>p.sex==="F"?"Femenino":p.sex==="M"?"Masculino":"Sin información";
+const dimensions={sector:"Programa / área",community:"Comunidad",day:"Fecha",activity:"Actividad",phase:"Fase",staff:"Responsable",age:"Grupo de edad",sex:"Sexo registrado",disability:"Discapacidad",none:"Total"};
+const measures={unique:"Personas únicas",visits:"Asistencias",sessions:"Actividades validadas",disabled:"Personas únicas con discapacidad",unknown:"Personas sin dato de discapacidad"};
+const personDimensions=new Set(["age","sex","disability"]);
+const dimValue=(d,r,p)=>({sector:r.sector,community:r.community,day:r.day,activity:r.code+" · "+r.name,phase:phaseNames[r.phase],staff:r.staff,age:p?ageBand(p):"",sex:p?genderLabel(p):"",disability:p?disabilityLabel(p):"",none:"Total"})[d];
+function exploreData(rows,metricKey,dim,cross,criteria={}){
+ const measured=validRows(rows), hasPersonFilter=!!(criteria.age||criteria.sex||criteria.disability);
+ const qualifies=p=>p&&(!criteria.age||ageBand(p)===criteria.age)&&(!criteria.sex||genderLabel(p)===criteria.sex)&&(!criteria.disability||disabilityLabel(p)===criteria.disability)&&(metricKey!=="disabled"||p.disability==="yes")&&(metricKey!=="unknown"||!["yes","no"].includes(p.disability));
+ const groups=new Map(), overallPeople=new Set(), overallSessions=new Set();let overallVisits=0;
+ for(const r of measured){
+  const people=personRows(unique(r.people)).filter(qualifies);
+  if(metricKey==="sessions"&&!people.length&&!hasPersonFilter&&!personDimensions.has(dim)&&!personDimensions.has(cross)){const key=JSON.stringify([dimValue(dim,r),dimValue(cross,r)]);if(!groups.has(key))groups.set(key,{people:new Set(),sessions:new Set(),visits:0});groups.get(key).sessions.add(r.id);overallSessions.add(r.id)}
+  for(const p of people){
+   const key=JSON.stringify([dimValue(dim,r,p),dimValue(cross,r,p)]);
+   if(!groups.has(key))groups.set(key,{people:new Set(),sessions:new Set(),visits:0});const g=groups.get(key);
+   g.people.add(p.id);g.sessions.add(r.id);g.visits++;overallPeople.add(p.id);overallSessions.add(r.id);overallVisits++;
+  }
+ }
+ const count=g=>metricKey==="sessions"?g.sessions.size:metricKey==="visits"?g.visits:g.people.size;
+ const values=[...groups].map(([key,g])=>({labels:JSON.parse(key),value:count(g)})).sort((a,b)=>dim==="day"?a.labels[0].localeCompare(b.labels[0]):b.value-a.value||a.labels.join().localeCompare(b.labels.join()));
+ const total=count({people:overallPeople,sessions:overallSessions,visits:overallVisits});
+ return {values,total,overlap:values.reduce((n,v)=>n+v.value,0)!==total,records:measured.length};
+}
+const palette=["#176ba0","#00896b","#8055b4","#df9a37","#576d8b","#d76477","#1b9aa8","#8c7944"];
+function graph(items,type,total,overlap){
+ const all=items.map((x,i)=>({...x,label:x.labels.filter((l,j)=>j===0||l!=="Total").join(" / "),color:palette[i%palette.length]}));const rows=all.slice(0,15);if(!rows.length||!rows.some(r=>r.value>0))return '<p class="empty">Sin registros que coincidan con esta consulta.</p>';
+ let graphType=type;
+ if(type==="donut"&&(overlap||rows.length!==all.length))graphType="bar";
+ if(type==="line"&&rows.length<2)graphType="bar";
+ let body="",w=640,h=230;
+ const max=Math.max(1,...rows.map(r=>r.value));
+ if(graphType==="donut"){
+  const circumference=2*Math.PI*72;let start=0;
+  body='<circle cx="120" cy="108" r="72" fill="none" stroke="#e8eef5" stroke-width="27"/>'+rows.map(r=>{const len=r.value/total*circumference;const c='<circle cx="120" cy="108" r="72" fill="none" stroke="'+r.color+'" stroke-width="27" stroke-dasharray="'+len+' '+(circumference-len)+'" stroke-dashoffset="'+(-start)+'" transform="rotate(-90 120 108)"/>';start+=len;return c}).join("")+'<text x="120" y="114" text-anchor="middle" font-size="28" font-weight="700" fill="#073664">'+total+'</text>';
+  h=Math.max(230,rows.length*23+28);
+  body+=rows.map((r,i)=>'<rect x="235" y="'+(20+i*23)+'" width="12" height="12" rx="2" fill="'+r.color+'"/><text x="255" y="'+(31+i*23)+'" font-size="12" fill="#30435a">'+esc(r.label.slice(0,42))+' · '+r.value+' ('+Math.round(r.value/total*100)+'%)</text>').join("");
+ }else if(graphType==="column"||graphType==="line"){
+  h=260;const step=540/rows.length;const pts=rows.map((r,i)=>[62+i*step+step/2,195-r.value/max*155]);
+  body='<path d="M55 32 V195 H610" stroke="#b9c8d8" fill="none"/>';
+  for(let i=0;i<=4;i++){const y=195-i*155/4;body+='<line x1="55" x2="610" y1="'+y+'" y2="'+y+'" stroke="#e5ebf2"/><text x="48" y="'+(y+4)+'" text-anchor="end" font-size="10" fill="#64748b">'+(max*i/4).toLocaleString("es",{maximumFractionDigits:1})+'</text>'}
+  if(graphType==="line")body+='<polyline points="'+pts.map(p=>p.join(",")).join(" ")+'" stroke="#176ba0" stroke-width="3" fill="none"/>';
+  rows.forEach((r,i)=>{let [x,y]=pts[i];if(graphType==="column")body+='<rect x="'+(x-Math.min(25,step*.3))+'" y="'+y+'" width="'+Math.min(50,step*.6)+'" height="'+(195-y)+'" rx="3" fill="'+r.color+'"/>';else body+='<circle cx="'+x+'" cy="'+y+'" r="5" fill="#176ba0"/>';body+='<text x="'+x+'" y="'+(y-8)+'" text-anchor="middle" font-size="12" font-weight="700" fill="#13243a">'+r.value+'</text><text x="'+x+'" y="210" transform="rotate(30 '+x+' 210)" font-size="10" fill="#52677d">'+esc(r.label.slice(0,18))+'</text>'});
+ }else{
+  h=rows.length*36+22;body=rows.map((r,i)=>{const y=10+i*36;return '<text x="0" y="'+(y+15)+'" font-size="12" fill="#30435a">'+esc(r.label.slice(0,35))+'</text><rect x="250" y="'+y+'" width="330" height="21" rx="4" fill="#edf2f7"/><rect x="250" y="'+y+'" width="'+(330*r.value/max)+'" height="21" rx="4" fill="'+r.color+'"/><text x="595" y="'+(y+15)+'" font-size="13" font-weight="700" fill="#13243a">'+r.value+'</text>'}).join("");
+ }
+ return '<div class="chart-scroll"><svg role="img" aria-label="Gráfico de '+esc(graphType)+'; consulte la tabla de valores" viewBox="0 0 '+w+' '+h+'" xmlns="http://www.w3.org/2000/svg">'+body+'</svg></div>'+(graphType!==type?'<p class="section-caption">Se utiliza un gráfico de barras porque el gráfico solicitado no representa correctamente esta selección.</p>':"")+(all.length>15?'<p class="section-caption">Gráfico limitado a 15 grupos. La tabla contiene todos los resultados.</p>':"");
+}
+function explorerShell(){return card("Explorador de datos · MERA",'<p>Combina indicadores de alcance, dimensiones y filtros para construir tus propias consultas. Solo datos ficticios validados.</p><div class="quick-queries"><strong>Preguntas frecuentes</strong><div class="actions" id="query-presets">'+[["program","¿Cuántas personas atendimos por programa?"],["age-sex","¿Cuál es el desagregado de edad y sexo?"],["disability","¿Cuántas personas con discapacidad atendimos?"],["disability-program","¿En qué programas participaron personas con discapacidad?"],["trend","¿Cómo evolucionaron las atenciones?"],["territory","¿Qué comunidades alcanzamos?"]].map(([k,q])=>'<button type="button" class="btn secondary" data-query="'+k+'">'+esc(q)+'</button>').join("")+'</div></div><div class="grid four">'+select("exp-measure","¿Qué medir?",Object.entries(measures),false)+select("exp-dim","Agrupar por",Object.entries(dimensions),false)+select("exp-cross","Cruzar con",Object.entries(dimensions),false)+select("exp-chart","Tipo de gráfico",[["bar","Barras horizontales"],["column","Columnas"],["donut","Anillo (grupos excluyentes)"],["line","Tendencia por fecha"]],false)+select("exp-age","Filtrar edad",["3–5","6–9","10–13","14–17","18","Sin información"])+select("exp-sex","Filtrar sexo registrado",["Femenino","Masculino","Sin información"])+select("exp-disability","Filtrar discapacidad",["Con discapacidad","Sin discapacidad","Sin información"])+'</div><div class="actions"><button class="btn" id="exp-run">Generar consulta</button><button class="btn secondary" id="exp-csv">Exportar tabla CSV</button></div><div id="exp-output" aria-live="polite"></div>');
+}
+function fixedAnalysis(rows){
+ const p=personRows(distinctPeople(validRows(rows)));
+ const result=(m,d,c="none")=>exploreData(rows,m,d,c);
+ const disability=result("unique","disability"),gender=result("unique","sex"),program=result("unique","sector"),age=result("unique","age","sex"),trend=result("visits","day");
+ return '<div class="metrics">'+metric("Con discapacidad",p.filter(x=>x.disability==="yes").length,"Personas únicas")+metric("Sin discapacidad",p.filter(x=>x.disability==="no").length,"Personas únicas")+metric("Sin información",p.filter(x=>!["yes","no"].includes(x.disability)).length,"No se presume ausencia")+metric("Cobertura del dato",p.length?Math.round(p.filter(x=>["yes","no"].includes(x.disability)).length/p.length*100)+"%":"N/D","Discapacidad conocida")+'</div><div class="grid">'+card("Alcance por programa / área",graph(program.values,"column",program.total,program.overlap)+'<p class="section-caption">Una persona puede participar en varios programas. El total no se obtiene sumando las barras.</p>')+card("Distribución por sexo registrado",graph(gender.values,"donut",gender.total,gender.overlap))+card("Desagregado por edad y sexo",graph(age.values,"bar",age.total,age.overlap)+table(["Edad","Femenino","Masculino","Sin dato","Total"],sexAge(p)))+card("Discapacidad · distribución",graph(disability.values,"donut",disability.total,disability.overlap))+card("Evolución de asistencias",graph(trend.values,"line",trend.total,trend.overlap))+card("Discapacidad por programa",table(["Programa","Con discapacidad","Sin discapacidad","Sin información","Personas únicas"],sectors.map(k=>{const q=personRows(distinctPeople(validRows(rows).filter(r=>r.sector===k)));return [k,q.filter(x=>x.disability==="yes").length,q.filter(x=>x.disability==="no").length,q.filter(x=>!["yes","no"].includes(x.disability)).length,q.length]})))+'</div>';
+}
+function wireExplorer(){
+ $("exp-cross").value="none";let last=null;
+ const settings={program:["unique","sector","none","column"],"age-sex":["unique","age","sex","bar"],disability:["unique","disability","none","donut"],"disability-program":["disabled","sector","none","bar"],trend:["visits","day","none","line"],territory:["unique","community","none","column"]};
+ function run(){
+  const m=$("exp-measure").value,d=$("exp-dim").value,c=$("exp-cross").value;const cross=d===c?"none":c;
+  const type=$("exp-chart").value;
+  const criteria={age:$("exp-age").value,sex:$("exp-sex").value,disability:$("exp-disability").value};
+  if(type==="line"&&(d!=="day"||cross!=="none")){$("exp-output").textContent="La tendencia requiere agrupar por fecha sin cruce. Selecciona otra visualización para los demás grupos.";last=null;return}
+  const r=exploreData(filtered(),m,d,cross,criteria);last={r,m,d,cross,criteria};
+  $("exp-output").innerHTML='<div class="notice"><strong>'+esc(measures[m])+' · '+r.total+'</strong><br>'+esc(dimensions[d])+(cross!=="none"?" × "+esc(dimensions[cross]):"")+' · '+r.records+' registros validados de ejemplo en el filtro principal. '+(r.overlap?"Los grupos se superponen: no sumar sus valores para obtener el total.":"")+'</div>'+graph(r.values,type,r.total,r.overlap)+table([dimensions[d],...(cross==="none"?[]:[dimensions[cross]]),measures[m]],r.values.map(v=>[v.labels[0],...(cross==="none"?[]:[v.labels[1]]),v.value]))+'<p class="section-caption">Total calculado sin duplicar '+(m==="sessions"?"sesiones":m==="visits"?"filas de una misma sesión":"identificadores")+'. '+(m==="sessions"&& (personDimensions.has(d)||personDimensions.has(cross)||Object.values(criteria).some(Boolean))?"Cuenta las sesiones con al menos una persona que cumple la condición. ":"")+'Las características ausentes se conservan como sin información. Los filtros demográficos no modifican la matriz de metas globales.</p>';
+ }
+ $("exp-run").onclick=run;
+ document.querySelectorAll("[data-query]").forEach(b=>b.onclick=()=>{const v=settings[b.dataset.query];["exp-measure","exp-dim","exp-cross","exp-chart"].forEach((k,i)=>$(k).value=v[i]);["exp-age","exp-sex","exp-disability"].forEach(k=>$(k).value="");run()});
+ for(const id of ["exp-measure","exp-dim","exp-cross","exp-chart","exp-age","exp-sex","exp-disability"])$(id).onchange=run;
+ $("exp-csv").onclick=()=>{if(!last)return;const {r,m,d,cross,criteria}=last;const safe=v=>'"'+String(v).replace(/^[=+\-@\t\r]/,"'").replace(/"/g,'""')+'"';const lines=[[dimensions[d],...(cross==="none"?[]:[dimensions[cross]]),measures[m]],...r.values.map(v=>[v.labels[0],...(cross==="none"?[]:[v.labels[1]]),v.value]),["TOTAL SIN DUPLICAR",...(cross==="none"?[]:[""]),r.total],["DATOS FICTICIOS"],["Desde",$("from").value,"Hasta",$("to").value],["Fase",$("phase").value,"Comunidad",$("community").value,"Área",$("sector").value],["Edad",criteria.age,"Sexo",criteria.sex,"Discapacidad",criteria.disability],["Grupos superpuestos",r.overlap?"Sí":"No"]];const blob=new Blob(["\uFEFF"+lines.map(l=>l.map(safe).join(";")).join("\n")],{type:"text/csv;charset=utf-8"});const url=URL.createObjectURL(blob),a=document.createElement("a");a.href=url;a.download="MERA-consulta-demostracion.csv";a.click();URL.revokeObjectURL(url)};
+ run();return run;
+}
+
+function mera(){root.innerHTML=back+nav("mera")+title("MERA | Seguimiento de resultados","Tablero de metas, resultados del período y acumulados")+notice+filters("mera")+'<div id="mera-dash"></div>'+explorerShell();
+ let refreshExplorer=()=>{};
+ const render=()=>{let phase=$("phase").value||"expansion",period=filtered(),acc=filtered(false),scope=!!($("sector").value||$("community").value);let items=cat.indicators.filter(i=>!$("sector").value||activityMap.some(a=>a.sector===$("sector").value&&(a.indicator===i.id||i.code.includes(a.code)))||(["Educación","Protección"].includes($("sector").value)&&i.id==="coverage"));const pct=(i,v)=>!scope&&i[phase]!=null&&i[phase]>0&&v!=null?Math.round(v/i[phase]*1000)/10:null;let data=items.map(i=>{let p=indicatorValue(i,period),t=indicatorValue(i,acc),target=i[phase];return {i,p,t,target,progress:pct(i,t)}});let measured=data.filter(d=>d.t!=null).length;
+ $("mera-dash").innerHTML='<div class="metrics">'+metric("Indicadores en vista",items.length,"Catálogo de referencia")+metric("Con datos de ejemplo",measured,"Validados ficticios")+metric("NNA únicos en período",distinctPeople(validRows(period)).length,"Sin repetir códigos")+metric("Asistencias en período",countVisits(validRows(period)),"No equivalen a beneficiarios únicos")+'</div><div class="grid">'+card("Avance de ejecución por área",sectors.map(s=>bar(s,validRows(period).filter(r=>r.sector===s).length,Math.max(1,validRows(period).length))).join(""))+card("Alcance acumulado de ejemplo",bar("NNA únicos",distinctPeople(validRows(acc)).length,Math.max(1,countVisits(validRows(acc))))+bar("Asistencias",countVisits(validRows(acc)),Math.max(1,countVisits(validRows(acc))))+'<p class="section-caption">No sumar participantes de áreas o fases sin deduplicar.</p>')+'</div>'+fixedAnalysis(period)+card("Avance frente a metas cuantificadas",scope?'<p class="empty">Selecciona todo el proyecto para comparar contra metas globales.</p>':(data.filter(d=>d.progress!=null).map(d=>'<p class="section-caption">'+esc(d.i.label)+' · '+esc(d.t)+' de '+esc(d.target)+'</p>'+bar(d.progress+"%",Math.min(d.progress,100),100)).join("")||'<p class="empty">Sin indicadores comparables en esta fase.</p>'))+card("Matriz de seguimiento",'<p class="section-caption">Meta de referencia por fase; el período y acumulado responden a los filtros. '+(scope?"No se calcula porcentaje frente a una meta global con filtros territoriales o sectoriales. ":"")+'N/D = sin medición de ejemplo, no equivale a cero. Los porcentajes requieren su denominador y evidencia.</p><div class="scroll"><table><thead><tr><th>Indicador / actividad</th><th>Meta de fase</th><th>Período</th><th>Acumulado</th><th>Avance</th></tr></thead><tbody>'+data.map(d=>'<tr><td><small>'+esc(d.i.code)+'</small><br>'+esc(d.i.label)+'</td><td class="num">'+(d.target==null?"N/D":d.target+(d.i.kind==="rate"?"%":""))+'</td><td class="num">'+(d.p??"N/D")+'</td><td class="num">'+(d.t??"N/D")+'</td><td class="num">'+(d.progress==null?"N/D":d.progress+"%")+'</td></tr>').join("")+'</tbody></table></div>');refreshExplorer()};
+ wireFilters(render);refreshExplorer=wireExplorer();
+}
+async function printReport(id,photos=[]){const text=$(id).value.trim();if(!text)return;const doc=document.createElement("article");doc.id="print-report";doc.className="print-only";const h=document.createElement("h1");h.textContent="FUNDAINIL · HumanHub / Educo";const pre=document.createElement("div");pre.textContent=text;doc.append(h,pre);document.body.append(doc);await appendEvidence(doc,photos);window.print();doc.remove()}
+const path=location.pathname.replace(/^\/demo(?=\/|$)/,"").replace(/\/+$/,"")||"/";
+if(path==="/")home();else if(path==="/educo")educo();else if(path==="/educo/campo")field();else if(path==="/educo/coordinacion")coordination();else if(path==="/educo/mera")mera();else educo();

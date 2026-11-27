@@ -1,0 +1,35 @@
+name: HumanHub validation
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [develop/humanhub-v2]
+permissions:
+  contents: read
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: sudo apt-get update && sudo apt-get install -y tesseract-ocr tesseract-ocr-spa tesseract-ocr-eng
+      - run: pip install -r requirements.txt
+      - run: python -m pytest -q
+      - run: node --check intelligence/app.js
+      - run: node --input-type=module --check < js/aggregate-export.js
+      - run: node --input-type=module --check < js/app.js
+
+      - run: node --check intelligence/educo.js
+
+      - run: node --check intelligence/attendance.js
+
+      - run: node --check preview/sandbox.js
+      - run: node scripts/build-sandbox.mjs
+
+      - run: node --check preview/portal.js
+      - run: test -f sandbox-dist/intelligence/educo-logo.svg && test -f sandbox-dist/intelligence/portal.js
+
+      - run: node --check preview/access.js
+      - run: test -f sandbox-dist/acceso.html && test -f sandbox-dist/intelligence/access.js

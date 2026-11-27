@@ -1,0 +1,19 @@
+# HumanHub | EDUCO · MERA
+
+## Alcance y procedencia
+Catálogo provisional de 38 indicadores construido con la matriz de la propuesta revisada de ampliación (versión de 34 páginas, secciones 4 y 9), el informe técnico de la fase original, la ficha de reporte por espacio y el plan operativo actualizado del 24/11/2026. No constituye aceptación contractual ni sustituye los originales. No se han incluido datos reales ni documentos internos en este repositorio público.
+
+- VE3501 y ampliación tienen metas separadas; el consolidado integrado debe ser depurado, no se suman personas entre fases.
+- Propuesta revisada: 1.300 NNA en al menos un servicio, 4 espacios fijos, 180 sesiones PS (confirmación pendiente en la matriz), 120 mujeres orientadas, 50 líderes formados de los cuales 24 lideresas, 600 kits escolares y 350 menstruales, 72 traslados; 80% percepción de seguridad, 75% avance en competencias, 100% (4/4) procedimientos de protección. La revisión plantea continuidad WASH sin nuevas instalaciones financiadas por la ampliación.
+- La propuesta anterior contiene metas diferentes. La revisión modifica duración y presupuesto; confirmar versión firmada y conciliación financiera antes de configurar compromisos. No se cargan importes ni se da por aprobada una revisión.
+- Plan operativo 25/11–30/12: 480 NNA educación, 360 PS, 60 sesiones por componente, 120 cuidadores, 24 facilitadores y 24 autocuidado, 30 jornadas, 4 comunidades/rutas. Las metas operativas no reemplazan metas del convenio; WASH puntos 2–4 y kits sujetos a stock, sin fijar cifra única.
+- Indirectos: sin meta automática, pendiente criterio IRIS validado por Educo; no multiplicar NNA ni contar directos como indirectos. N/D representa dato no disponible.
+- Caraballeda y Caricuao son comunidades de la propuesta revisada, no certificación de que estén operativas. La ficha admite estado del espacio y evidencia.
+
+## Uso en servidor de evaluación
+Abrir /educo desde Centro de Inteligencia. Seleccionar fase y comunidad, o consolidado independiente de proyecto. Registrar solo datos agregados, fuentes codificadas, evidencia y conteos contrastados; las fichas entran en revisión. La validación de gerencia reemplaza versiones del mismo corte, conservando historial. Solo los consolidados de proyecto validados alimentan el tablero. Una cifra acumulada no se calcula sumando fichas, ni tasas sin denominador. Se requiere listado codificado externo para deduplicar personas y verificar que los acumulados corresponden a los cortes. La cobertura de proyecto no es la suma de los servicios.
+
+Para informe ATLAS seleccionar proyecto exactamente EDUCO, fase y fechas. Se consultan las mediciones de consolidados validados contenidos en el período; se excluyen textos libres, casos y notas de revisión. Exportaciones Word/PDF/XLSX incluyen métricas MERA. Se exige revisión antes del envío por SMTP autorizado.
+
+## Límites
+La captura y revisión usan el acceso gerencial existente, no permisos individuales de campo/coordinación; todavía no es apto para datos reales. No se automatiza la deduplicación personal, no se almacenan expedientes, fotos ni identificadores. Los textos libres no garantizan anonimización. La ficha de caracterización territorial es agregada; planificación individual, matriz de riesgos, presupuesto/contabilidad y PDM detallados requieren desarrollo adicional. Los conteos de logística son seguimiento, no contabilidad ni inventario transaccional. Los indicadores sin datos ni metas aprobadas permanecen N/D. No se ha importado ningún avance real ni se ha enviado correo. CI y pruebas de integración deben verificarse antes de fusionar o desplegar.
