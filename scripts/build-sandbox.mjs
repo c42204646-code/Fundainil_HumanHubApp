@@ -33,5 +33,6 @@ await copyFile("intelligence/educo.css",out+"/intelligence/attendance-extra.css"
 for(const file of ["sandbox.js","sandbox.css"])await copyFile("preview/"+file,out+"/intelligence/"+file);
 // New pilot portal; the legacy technical screens remain separate.
 await copyFile("preview/portal.html",out+"/index.html");
-for(const f of ["portal.js","portal.css","educo-logo.svg"])await copyFile("preview/"+f,out+"/intelligence/"+f);
+await copyFile("preview/access.html",out+"/acceso.html");
+for(const f of ["portal.js","portal.css","educo-logo.svg","access.js"])await copyFile("preview/"+f,out+"/intelligence/"+f);
 console.log("Static HumanHub preview built: "+indicators.length+" indicators; no backend, no credentials, no data writes.");
