@@ -14,7 +14,7 @@ async function api(path,method="GET",payload,token=accessToken){
  return res.status===204?null:await res.json();
 }
 function reset(text){
- authEpoch++;panelEpoch++;accessToken=null;projects=[];clearTimeout(expiryTimer);
+ authEpoch++;panelEpoch++;phaseRegistry=[];accessToken=null;projects=[];clearTimeout(expiryTimer);
  if($("pilot-panel"))$("pilot-panel").replaceChildren();$("staff-panel").replaceChildren();$("staff-panel").hidden=true;$("enrollment").hidden=true;$("signup-password").value="";$("signup-repeat").value="";$("signup-submit").disabled=false;$("workspace").hidden=true;$("signin").hidden=false;$("projects").replaceChildren();$("catalog-content").replaceChildren();$("catalog").hidden=true;$("password").value="";$("login").disabled=false;
  message(text??"");
 }
@@ -49,7 +49,9 @@ async function readCatalog(projectId){
 }
 
 const rpc=(name,payload)=>api("/rest/v1/rpc/"+name,"POST",payload);
-const projectPhase=phase=>({original:"Educo · Proyecto original",expansion:"Educo · Proyecto de ampliación",shared:"Educo · Atribución compartida"}[phase]??"Educo · Fase no definida");
+const phaseShort=phase=>({original:"Educo · Proyecto original",expansion:"Educo · Proyecto de ampliación",shared:"Educo · Atribución compartida"}[phase]??"Educo · Fase no definida");
+let phaseRegistry=[];
+const projectPhase=phase=>{const p=phaseRegistry.find(x=>x.phase===phase);return p?(p.reference_code?p.reference_code+" · ":"")+p.title+(p.document_status==="proposed"?" (propuesta)":""):phaseShort(phase)};
 async function renderStaff(){
  const epoch=authEpoch, panel=$("staff-panel");panel.hidden=false;panel.replaceChildren();
  const rows=await rpc("hh_my_staff_profile",{});if(epoch!==authEpoch)return;
@@ -136,6 +138,7 @@ async function openPilot(project,mode){
   const access=await rpc("hh_my_access",{});if(!alive())return;
   const member=access.find(p=>p.project_id===project&&p.project_code==="EDUCO-SANDBOX");
   if(!member||!({field:member.field_access,coord:member.coord_access,mera:member.mera_access}[mode])){panel.replaceChildren(node("p","No tienes acceso activo a este módulo.","notice"));return}
+  const phaseRows=await rpc("hh_project_phases",{p_project:project});if(!alive())return;phaseRegistry=Array.isArray(phaseRows)?phaseRows:[];
   const section=node("section",null,"card"),output=node("div"),status=node("p",null,"status");
   section.append(node("h2",({field:"Reporte de campo · prueba persistente",coord:"Coordinación · revisión de reportes",mera:"MERA · sesiones validadas"})[mode]),node("p","SOLO PRUEBAS FICTICIAS. No ingreses nombres, listas ni fotografías de personas reales. Usa imágenes de materiales de prueba.","notice"));
   panel.replaceChildren(section);
@@ -145,7 +148,7 @@ async function openPilot(project,mode){
    if(!data.length){output.append(node("p","No hay reportes registrados.","empty"));return}
    const rows=data.map(r=>{
     const detail=node("div");detail.append(node("p",r.strategy),node("p","Resultado: "+(r.achievements||"No informado")),node("p","Dificultades: "+(r.challenges||"No informadas")),node("p","Revisión: "+(r.review_note||"Sin observaciones")));
-    const evidence=node("div");const show=node("button","Ver evidencias","btn secondary");show.type="button";show.onclick=async()=>{show.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;evidence.replaceChildren();if(photos.length)await appendEvidence(evidence,photos);else evidence.append(node("p","Sin fotografías adjuntas.","section-caption"))}catch{if(alive())evidence.textContent="No se pudieron consultar las evidencias."}finally{if(alive())show.disabled=false}};const pdf=node("button","Imprimir / PDF","btn secondary");pdf.type="button";pdf.onclick=async()=>{pdf.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;const doc=node("article",null,"print-only");doc.id="print-report";doc.append(node("h1","FUNDAINIL · HumanHub / Educo"),node("p","REPORTE DE PRUEBA · "+r.day+" · "+r.program_code+" · "+r.logical_code+" · "+projectPhase(r.phase)),node("p","Estado: "+({review:"Pendiente",validated:"Validado",returned:"Devuelto"}[r.state]??r.state)),node("h2","Estrategia"),node("p",r.strategy),node("h2","Resultados"),node("p",r.achievements||"No informado"),node("h2","Dificultades"),node("p",r.challenges||"No informadas"),node("h2","Observaciones de revisión"),node("p",r.review_note||"Sin observaciones"));document.body.append(doc);try{await appendEvidence(doc,photos);if(alive())window.print()}finally{doc.remove()}}catch{if(alive())status.textContent="No se pudo preparar el informe para impresión."}finally{if(alive())pdf.disabled=false}};detail.append(show,pdf,evidence);
+    const evidence=node("div");const show=node("button","Ver evidencias","btn secondary");show.type="button";show.onclick=async()=>{show.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;evidence.replaceChildren();if(photos.length)await appendEvidence(evidence,photos);else evidence.append(node("p","Sin fotografías adjuntas.","section-caption"))}catch{if(alive())evidence.textContent="No se pudieron consultar las evidencias."}finally{if(alive())show.disabled=false}};const pdf=node("button","Imprimir / PDF","btn secondary");pdf.type="button";pdf.onclick=async()=>{pdf.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;const doc=node("article",null,"print-only");doc.id="print-report";doc.append(node("h1","FUNDAINIL · HumanHub / Educo"),node("h2",projectPhase(r.phase)),node("p","REPORTE DE PRUEBA · "+r.day+" · "+r.program_code+" · "+r.logical_code),node("p","Estado: "+({review:"Pendiente",validated:"Validado",returned:"Devuelto"}[r.state]??r.state)),node("h2","Estrategia"),node("p",r.strategy),node("h2","Resultados"),node("p",r.achievements||"No informado"),node("h2","Dificultades"),node("p",r.challenges||"No informadas"),node("h2","Observaciones de revisión"),node("p",r.review_note||"Sin observaciones"));document.body.append(doc);try{await appendEvidence(doc,photos);if(alive())window.print()}finally{doc.remove()}}catch{if(alive())status.textContent="No se pudo preparar el informe para impresión."}finally{if(alive())pdf.disabled=false}};detail.append(show,pdf,evidence);
     const ctl=node("div");
     if(mode==="coord"&&r.can_review){
      const note=fieldControl("Observación de revisión (ficticia)","textarea");ctl.append(note.l);
@@ -163,9 +166,9 @@ async function openPilot(project,mode){
    const opts=await rpc("hh_pilot_options",{p_project:project});if(!alive())return;
    if(!opts.length){section.append(node("p","Catálogo no disponible.","notice"));return}
    const form=node("form"),grid=node("div",null,"grid");
-   const phase=fieldControl("Proyecto al que corresponde el reporte","select",[["","Selecciona el proyecto"],["original",projectPhase("original")],["expansion",projectPhase("expansion")]]);phase.e.required=true;
-   const activity=fieldControl("Actividad del marco lógico","select",[]);activity.e.required=true;
-   function updateActivities(){activity.e.replaceChildren();const blank=node("option","Selecciona una actividad");blank.value="";activity.e.append(blank);opts.forEach((o,i)=>{if(o.phase===phase.e.value){const x=node("option",o.program_label+" · "+o.logical_code+" · "+o.activity_label);x.value=String(i);activity.e.append(x)}});activity.e.disabled=!phase.e.value;}
+   const phase=fieldControl("Proyecto al que corresponde el reporte","select",[["","Selecciona el proyecto"],...phaseRegistry.filter(p=>p.phase==="original"||p.phase==="expansion").map(p=>[p.phase,projectPhase(p.phase)])]);phase.e.required=true;
+   const activity=fieldControl("Actividad del marco lógico","select",[]);activity.e.required=true;const phaseInfo=node("p", "Selecciona un proyecto para vincular su título al reporte.","section-caption");
+   function updateActivities(){activity.e.replaceChildren();const blank=node("option","Selecciona una actividad");blank.value="";activity.e.append(blank);opts.forEach((o,i)=>{if(o.phase===phase.e.value){const x=node("option",o.program_label+" · "+o.logical_code+" · "+o.activity_label);x.value=String(i);activity.e.append(x)}});activity.e.disabled=!phase.e.value;phaseInfo.textContent=phase.e.value?projectPhase(phase.e.value):"Selecciona el proyecto para continuar.";}
    phase.e.onchange=updateActivities;updateActivities();
    const day=fieldControl("Fecha","date");day.e.value=dateLocal();day.e.max=dateLocal();day.e.required=true;
    const shift=fieldControl("Turno","select",[["AM","Mañana"],["PM","Tarde"]]);
@@ -173,7 +176,7 @@ async function openPilot(project,mode){
    const strategy=fieldControl("Estrategia ficticia","textarea");strategy.e.required=true;
    const outcome=fieldControl("Resultado ficticio observado","textarea"),challenges=fieldControl("Dificultades ficticias","textarea");
    const consent=node("label",null,"check"),check=node("input");check.type="checkbox";check.required=true;consent.append(check,document.createTextNode(" Confirmo que todos los datos son inventados para la prueba."));
-   grid.append(phase.l,activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
+   grid.append(phase.l,phaseInfo,activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
    const button=node("button","Enviar reporte a revisión","btn wide");button.type="submit";
    const photoBlock=node("section",null,"card");photoBlock.append(node("h3","Evidencias fotográficas (opcional)"));const picker=evidencePicker(photoBlock);form.append(node("p",opts[0].space_label),grid,photoBlock,consent,button);
    form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];if(!phase.e.value||activity.e.value===""||!o||o.phase!==phase.e.value){status.textContent="Selecciona el proyecto y su actividad.";return}let photos;try{photos=picker.get()}catch(err){status.textContent=err.message;return}button.disabled=true;try{await rpc("hh_pilot_submit_photos",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value,p_photos:photos});if(alive()){picker.clear();strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
@@ -183,7 +186,7 @@ async function openPilot(project,mode){
    const filters=node("div",null,"grid"),from=fieldControl("Desde","date"),to=fieldControl("Hasta","date");to.e.value=dateLocal();from.e.value=to.e.value.slice(0,8)+"01";const b=node("button","Consultar resultados validados","btn");b.type="button";filters.append(from.l,to.l);section.append(filters,b,status,output);
    async function load(){if(!from.e.value||!to.e.value||from.e.value>to.e.value){status.textContent="Selecciona un período válido.";return}b.disabled=true;try{
     const rows=await rpc("hh_pilot_mera",{p_project:project,p_from:from.e.value,p_to:to.e.value});if(!alive())return;
-    output.replaceChildren(node("p","Sesiones de prueba validadas en el período: "+rows.reduce((n,r)=>n+Number(r.validated_period),0)),dataTable(["Programa","Actividad","Código","Fase","Meta","Período","Acumulado"],rows.map(r=>[r.program_code,r.activity_key,r.logical_code,r.phase,"N/D",r.validated_period,r.validated_accumulated])));
+    output.replaceChildren(node("p","Sesiones de prueba validadas en el período: "+rows.reduce((n,r)=>n+Number(r.validated_period),0)),dataTable(["Programa","Actividad","Código","Fase","Meta","Período","Acumulado"],rows.map(r=>[r.program_code,r.activity_key,r.logical_code,projectPhase(r.phase),"N/D",r.validated_period,r.validated_accumulated])));
     status.textContent=rows.length?"Resultados consultados en PostgreSQL.":"No hay sesiones de prueba aprobadas para el corte.";
    }catch{if(alive())status.textContent="No se pudo consultar el agregado autorizado."}finally{if(alive())b.disabled=false}}
    b.onclick=load;await load();
