@@ -21,10 +21,10 @@ function reset(text){
 function renderProjects(){
  const container=$("projects");container.replaceChildren();
  for(const p of projects){
-  const box=node("section",null,"card");box.append(node("h2",p.project_name),node("p","Rol asignado: "+({field:"Campo",coordinator:"Coordinación",monitoring:"MERA",manager:"Gerencia",director:"Dirección",auditor:"Auditoría"}[p.member_role]??"No reconocido")));
-  const grid=node("div",null,"grid three");
+  const box=node("section",null,"card institutional-project");const welcome=node("div",null,"welcome");const logo=node("img",null,"educo-logo");logo.src="/intelligence/educo-logo.svg";logo.alt="Educo";welcome.append(logo,node("h1","¿Qué deseas realizar?"),node("p","Selecciona tu área de trabajo."));box.append(welcome,node("p","Rol asignado: "+({field:"Campo",coordinator:"Coordinación",monitoring:"MERA",manager:"Gerencia",director:"Dirección",auditor:"Auditoría"}[p.member_role]??"No reconocido")));
+  const grid=node("div",null,"project-grid");
   for(const [allowed,label,mode] of [[p.field_access,"Reporte de campo","field"],[p.coord_access,"Coordinación","coord"],[p.mera_access,"MERA","mera"]]){
-   const card=node("div",null,"tile");card.append(node("h3",label),node("p",allowed?"Permiso institucional activo · consulta las condiciones del módulo":"Sin permiso para este módulo"),node("span",allowed?"Autorizado":"Restringido","tag "+(allowed?"green":"orange")));if(allowed&&p.project_code==="EDUCO-SANDBOX"){const b=node("button","Abrir módulo","btn");b.type="button";b.onclick=()=>openPilot(p.project_id,mode);card.append(b)}grid.append(card);
+   const card=node("div",null,"tile");card.append(node("span",({field:"✎",coord:"▤",mera:"▥"})[mode],"symbol"),node("h2",label),node("p",({field:"Registro diario de actividades y evidencias",coord:"Supervisión, validación e informes",mera:"Monitoreo de metas y resultados"})[mode]),node("span",allowed?"Acceso autorizado":"Sin permiso","tag "+(allowed?"green":"orange")));if(allowed&&p.project_code==="EDUCO-SANDBOX"){const b=node("button","Abrir módulo","btn");b.type="button";b.onclick=()=>openPilot(p.project_id,mode);card.append(b)}grid.append(card);
   }
   box.append(grid);
   const b=node("button","Consultar catálogo en Supabase","btn secondary");b.type="button";b.addEventListener("click",()=>readCatalog(p.project_id));box.append(b);container.append(box);
@@ -133,6 +133,8 @@ async function appendEvidence(doc,photos){
  for(const p of photos){const figure=document.createElement("figure"),img=document.createElement("img"),cap=document.createElement("figcaption");figure.className="evidence-figure";img.src="data:image/jpeg;base64,"+(p.jpeg??p.jpeg_base64);img.alt=p.caption;cap.textContent=p.caption;figure.append(img,cap);doc.append(figure);try{await img.decode()}catch{img.remove();cap.textContent+=" (imagen no disponible)"}}
 }
 
+function metricCards(items){const box=node("div",null,"metrics");for(const [label,value] of items){const card=node("div",null,"metric");card.append(node("small",label),node("strong",String(value)));box.append(card)}return box}
+function programBars(counts,title){const box=node("section",null,"card");box.append(node("h2",title));const entries=Object.entries(counts),max=Math.max(1,...entries.map(([,v])=>v));if(!entries.length){box.append(node("p","Sin registros para la selección.","muted"));return box}for(const [key,v] of entries){const row=node("div",null,"bar-row"),track=node("div",null,"bar-track"),meter=node("meter");meter.max=max;meter.value=v;meter.setAttribute("aria-label",key+": "+v);track.append(meter);row.append(node("span",({EDU:"Educación",PROT:"Protección",WASH:"WASH"})[key]??key),track,node("strong",String(v)));box.append(row)}return box}
 async function openPilot(project,mode){
  const epoch=authEpoch,pe=++panelEpoch,panel=$("pilot-panel");if(!accessToken)return;
  const alive=()=>epoch===authEpoch&&pe===panelEpoch&&!!accessToken;
@@ -142,12 +144,15 @@ async function openPilot(project,mode){
   const member=access.find(p=>p.project_id===project&&p.project_code==="EDUCO-SANDBOX");
   if(!member||!({field:member.field_access,coord:member.coord_access,mera:member.mera_access}[mode])){panel.replaceChildren(node("p","No tienes acceso activo a este módulo.","notice"));return}
   const phaseRows=await rpc("hh_project_phases",{p_project:project});if(!alive())return;phaseRegistry=Array.isArray(phaseRows)?phaseRows:[];
-  const section=node("section",null,"card"),output=node("div"),status=node("p",null,"status");
-  section.append(node("h2",({field:"Reporte de campo · prueba persistente",coord:"Coordinación · revisión de reportes",mera:"MERA · sesiones validadas"})[mode]),node("p","SOLO PRUEBAS FICTICIAS. No ingreses nombres, listas ni fotografías de personas reales. Usa imágenes de materiales de prueba.","notice"));
+  const section=node("section",null,"card"),output=node("div"),status=node("p",null,"status");const nav=node("nav",null,"scope no-print");for(const [key,label,allowed] of [["field","Reporte de campo",member.field_access],["coord","Coordinación",member.coord_access],["mera","MERA",member.mera_access]]){if(!allowed)continue;const b=node("button",label,key===mode?"btn":"btn secondary");b.type="button";b.onclick=()=>openPilot(project,key);nav.append(b)}section.append(nav);
+  section.append(node("h1",({field:"Reporte de campo",coord:"Centro de coordinación",mera:"MERA | Seguimiento de resultados"})[mode]),node("p",({field:"Registro y envío de actividades a revisión",coord:"Supervisión de actividades y resultados",mera:"Sesiones validadas por período y acumulado"})[mode],"muted"),node("p","Validación operativa: las sesiones de este circuito son de prueba. No registrar datos reales de beneficiarios ni imágenes identificables.","notice"));
   panel.replaceChildren(section);
+  let reportFilter=null;
   async function listReports(){
-   const data=await rpc("hh_pilot_reports",{p_project:project});if(!alive())return;
+   const all=await rpc("hh_pilot_reports",{p_project:project});if(!alive())return;
+   const data=reportFilter?all.filter(r=>(!reportFilter.from.e.value||r.day>=reportFilter.from.e.value)&&(!reportFilter.to.e.value||r.day<=reportFilter.to.e.value)&&(!reportFilter.phase.e.value||r.phase===reportFilter.phase.e.value)&&(!reportFilter.program.e.value||r.program_code===reportFilter.program.e.value)&&(!reportFilter.state.e.value||r.state===reportFilter.state.e.value)):all;
    output.replaceChildren(node("h3",mode==="field"?"Mis reportes / reportes autorizados":"Reportes recibidos"));
+   if(mode==="coord"){output.append(metricCards([["Reportes consultados",data.length],["Validados",data.filter(r=>r.state==="validated").length],["Pendientes",data.filter(r=>r.state==="review").length],["Devueltos",data.filter(r=>r.state==="returned").length]]));output.append(node("p","Participantes únicos y asistencias: no disponibles hasta integrar el registro de beneficiarios. Consulta limitada a los 200 reportes más recientes autorizados.","section-caption"));output.append(programBars(data.filter(r=>r.state==="validated").reduce((a,r)=>(a[r.program_code]=(a[r.program_code]||0)+1,a),{}),"Actividades validadas por área"));}
    if(!data.length){output.append(node("p","No hay reportes registrados.","empty"));return}
    const rows=data.map(r=>{
     const detail=node("div");detail.append(node("p",r.strategy),node("p","Resultado: "+(r.achievements||"No informado")),node("p","Dificultades: "+(r.challenges||"No informadas")),node("p","Revisión: "+(r.review_note||"Sin observaciones")));
@@ -184,12 +189,18 @@ async function openPilot(project,mode){
    const photoBlock=node("section",null,"card");photoBlock.append(node("h3","Evidencias fotográficas (opcional)"));const picker=evidencePicker(photoBlock);form.append(node("p",opts[0].space_label),grid,photoBlock,consent,button);
    form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];if(!phase.e.value||activity.e.value===""||!o||o.phase!==phase.e.value){status.textContent="Selecciona el proyecto y su actividad.";return}let photos;try{photos=picker.get()}catch(err){status.textContent=err.message;return}button.disabled=true;try{await rpc("hh_pilot_submit_photos",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value,p_photos:photos});if(alive()){picker.clear();strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
    section.append(form,status,output);await listReports();
-  }else if(mode==="coord"){section.append(status,output);await listReports()}
+  }else if(mode==="coord"){
+   const filterBox=node("section",null,"card"),grid=node("div",null,"grid");
+   const from=fieldControl("Desde","date"),to=fieldControl("Hasta","date"),phase=fieldControl("Proyecto","select",[["","Todos"],...phaseRegistry.map(p=>[p.phase,phaseShort(p.phase)])]),program=fieldControl("Área de intervención","select",[["","Todas"],["EDU","Educación"],["PROT","Protección"],["WASH","WASH"]]),state=fieldControl("Estado","select",[["","Todos"],["review","Pendiente"],["validated","Validado"],["returned","Devuelto"]]);
+   reportFilter={from,to,phase,program,state};grid.append(from.l,to.l,phase.l,program.l,state.l);const refresh=node("button","Consultar reportes","btn"),clear=node("button","Restablecer filtros","btn secondary");refresh.type=clear.type="button";
+   const refreshList=async()=>{if(from.e.value&&to.e.value&&from.e.value>to.e.value){status.textContent="El período no es válido.";return}refresh.disabled=true;try{await listReports();if(alive())status.textContent="Consulta actualizada."}catch{if(alive())status.textContent="No se pudieron consultar los reportes."}finally{if(alive())refresh.disabled=false}};
+   refresh.onclick=refreshList;clear.onclick=()=>{for(const f of Object.values(reportFilter))f.e.value="";refreshList()};const actions=node("div",null,"actions");actions.append(refresh,clear);filterBox.append(node("h2","Filtros de seguimiento"),grid,actions);section.append(filterBox,status,output);await listReports()
+  }
   else{
    const filters=node("div",null,"grid"),from=fieldControl("Desde","date"),to=fieldControl("Hasta","date");to.e.value=dateLocal();from.e.value=to.e.value.slice(0,8)+"01";const b=node("button","Consultar resultados validados","btn");b.type="button";filters.append(from.l,to.l);section.append(filters,b,status,output);
    async function load(){if(!from.e.value||!to.e.value||from.e.value>to.e.value){status.textContent="Selecciona un período válido.";return}b.disabled=true;try{
     const rows=await rpc("hh_pilot_mera",{p_project:project,p_from:from.e.value,p_to:to.e.value});if(!alive())return;
-    output.replaceChildren(node("p","Sesiones de prueba validadas en el período: "+rows.reduce((n,r)=>n+Number(r.validated_period),0)),dataTable(["Programa","Actividad","Código","Fase","Meta","Período","Acumulado"],rows.map(r=>[r.program_code,r.activity_key,r.logical_code,projectPhase(r.phase),"N/D",r.validated_period,r.validated_accumulated])));
+    output.replaceChildren(metricCards([["Sesiones validadas · período",rows.reduce((n,r)=>n+Number(r.validated_period),0)],["Sesiones validadas · acumulado",rows.reduce((n,r)=>n+Number(r.validated_accumulated),0)],["Beneficiarios únicos","N/D"],["Asistencias","N/D"]]),programBars(rows.reduce((a,r)=>(a[r.program_code]=(a[r.program_code]||0)+Number(r.validated_period),a),{}),"Sesiones validadas por área"),node("p","Metas contractuales y alcance de participantes: pendientes de integración. No se estiman ni se sustituyen por cifras de ejemplo.","section-caption"),dataTable(["Programa","Actividad","Código","Fase","Meta","Período","Acumulado"],rows.map(r=>[r.program_code,r.activity_key,r.logical_code,projectPhase(r.phase),"N/D",r.validated_period,r.validated_accumulated])));
     status.textContent=rows.length?"Resultados consultados en PostgreSQL.":"No hay sesiones de prueba aprobadas para el corte.";
    }catch{if(alive())status.textContent="No se pudo consultar el agregado autorizado."}finally{if(alive())b.disabled=false}}
    b.onclick=load;await load();
@@ -211,6 +222,7 @@ $("login-form").addEventListener("submit",async e=>{
   if(!Array.isArray(rows))throw Error("Invalid access result");
   projects=rows;
   $("signin").hidden=true;$("enrollment").hidden=true;$("workspace").hidden=false;renderProjects();message(rows.length?"Sesión autenticada.":"Cuenta autenticada. Completa o consulta tu solicitud de acceso.");await renderStaff();if(epoch!==authEpoch)return;
+  const requested=({campo:"field",coordinacion:"coord",mera:"mera"})[location.pathname.split("/").filter(Boolean).pop()];if(requested){const p=projects.find(x=>x.project_code==="EDUCO-SANDBOX"&&({field:x.field_access,coord:x.coord_access,mera:x.mera_access}[requested]));if(p)await openPilot(p.project_id,requested);else message("Tu cuenta no tiene permiso para este módulo.")}
   const duration=Math.min(15*60,Math.max(1,Number(data.expires_in)||60));expiryTimer=setTimeout(()=>reset("La sesión ha expirado. Vuelve a ingresar."),duration*1000);
  }catch(e){if(epoch===authEpoch)reset("No se pudo iniciar sesión o verificar los permisos. Revisa tus credenciales o contacta a administración.")}
 });
