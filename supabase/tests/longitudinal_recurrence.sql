@@ -61,6 +61,10 @@ begin
   if (select count(distinct participant_id) from humanhub.attendance_history where project_id=p)<>1 then raise exception 'incorrect unique count'; end if;
   if (select program_sequence from humanhub.attendance_history where session_id=first_session and participant_id=person)<>1 then raise exception 'backfill ordering incorrect'; end if;
   if (select count(*) from humanhub.attendance_history where project_id=p and disability_recorded='unknown')<>4 then raise exception 'unknown disability not preserved'; end if;
+  select * into strict rec from humanhub.recurrence_demographics(p,date '2026-12-01',date '2026-12-31','program',c,'expansion') where scope_key='EDU';
+  if (rec.unique_people,rec.returning_people,rec.recurrent_people,rec.attendances,rec.repeat_attendances,rec.age_group,rec.sex_recorded,rec.disability_recorded) is distinct from (1::bigint,1::bigint,1::bigint,1::bigint,1::bigint,'10-13'::text,'female'::text,'unknown'::text) then raise exception 'demographic breakdown incorrect'; end if;
+  select * into strict rec from humanhub.recurrence_demographics(p,date '2026-11-25',date '2026-12-02','project',null,null);
+  if (rec.unique_people,rec.attendances,rec.first_attendances,rec.repeat_attendances) is distinct from (1::bigint,4::bigint,1::bigint,3::bigint) then raise exception 'project dedup incorrect'; end if;
   -- A reviewed row cannot be silently edited.
   begin
    update humanhub.batch_rows set disability_recorded='no' where batch_id=batch;
@@ -71,6 +75,6 @@ begin
   raise notice 'All recurrence assertions passed and synthetic fixture rolled back';
  end;
 end $test$;
-select 'PASS: recurrence, chronology, activity separation, duplicate scan, approval and immutable demographics; fixture rolled back' as result,
+select 'PASS: recurrence, chronology, activity separation, duplicate scan, approval, demographic breakdown and immutable demographics; fixture rolled back' as result,
  (select count(*) from humanhub.projects where code='TEST_RECURRENCE') as fixture_projects_remaining,
  (select count(*) from humanhub.attendance) as attendance_remaining;
