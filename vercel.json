@@ -13,30 +13,6 @@
       "destination": "/acceso.html"
     },
     {
-      "source": "/educo/asistencia",
-      "destination": "/asistencia.html"
-    },
-    {
-      "source": "/demo",
-      "destination": "/demo.html"
-    },
-    {
-      "source": "/demo/educo",
-      "destination": "/demo.html"
-    },
-    {
-      "source": "/demo/educo/campo",
-      "destination": "/demo.html"
-    },
-    {
-      "source": "/demo/educo/coordinacion",
-      "destination": "/demo.html"
-    },
-    {
-      "source": "/demo/educo/mera",
-      "destination": "/demo.html"
-    },
-    {
       "source": "/educo",
       "destination": "/acceso.html"
     },
@@ -101,6 +77,58 @@
           "value": "no-store"
         }
       ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/demo",
+      "destination": "/acceso",
+      "permanent": false
+    },
+    {
+      "source": "/demo.html",
+      "destination": "/acceso",
+      "permanent": false
+    },
+    {
+      "source": "/demo/educo",
+      "destination": "/educo",
+      "permanent": false
+    },
+    {
+      "source": "/demo/educo/campo",
+      "destination": "/educo/campo",
+      "permanent": false
+    },
+    {
+      "source": "/demo/educo/coordinacion",
+      "destination": "/educo/coordinacion",
+      "permanent": false
+    },
+    {
+      "source": "/demo/educo/mera",
+      "destination": "/educo/mera",
+      "permanent": false
+    },
+    {
+      "source": "/educo/asistencia",
+      "destination": "/acceso",
+      "permanent": false
+    },
+    {
+      "source": "/asistencia.html",
+      "destination": "/acceso",
+      "permanent": false
+    },
+    {
+      "source": "/intelligence.html",
+      "destination": "/acceso",
+      "permanent": false
+    },
+    {
+      "source": "/mera-legacy.html",
+      "destination": "/acceso",
+      "permanent": false
     }
   ]
 }
