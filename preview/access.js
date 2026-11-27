@@ -52,25 +52,41 @@ const rpc=(name,payload)=>api("/rest/v1/rpc/"+name,"POST",payload);
 const phaseShort=phase=>({original:"Educo · Proyecto original",expansion:"Educo · Proyecto de ampliación",shared:"Educo · Atribución compartida"}[phase]??"Educo · Fase no definida");
 let phaseRegistry=[];
 const projectPhase=phase=>{const p=phaseRegistry.find(x=>x.phase===phase);return p?(p.reference_code?p.reference_code+" · ":"")+p.title+(p.document_status==="proposed"?" (propuesta)":""):phaseShort(phase)};
-async function renderStaff(){
- const epoch=authEpoch, panel=$("staff-panel");panel.hidden=false;panel.replaceChildren();
+async function renderStaff(metadata={}){
+ const epoch=authEpoch,panel=$("staff-panel");panel.hidden=false;panel.replaceChildren();
  const rows=await rpc("hh_my_staff_profile",{});if(epoch!==authEpoch)return;
- const profile=rows[0];
- if(profile){panel.append(node("h2","Mi perfil institucional"),node("p",profile.full_name+" · "+profile.specialty+" · "+profile.job_title),node("p","Estado: "+({pending:"Pendiente de aprobación por gerencia",approved:"Aprobado",rejected:"Solicitud no aprobada"}[profile.state]??profile.state)))}
+ let profile=rows[0];
+ if(!projects.length&&(profile?.state==="pending"||(!profile&&metadata.hh_name&&metadata.hh_specialty&&metadata.hh_title))){
+  const details=profile?{p_name:profile.full_name,p_specialty:profile.specialty,p_title:profile.job_title}:{p_name:metadata.hh_name,p_specialty:metadata.hh_specialty,p_title:metadata.hh_title};
+  try{await rpc("hh_request_staff_access",details);if(epoch!==authEpoch)return;projects=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;renderProjects();profile=(await rpc("hh_my_staff_profile",{}))[0];if(epoch!==authEpoch)return;message(projects.length?"Cuenta activa. Ya puedes ingresar a tu módulo.":"Acceso no habilitado. Contacta a gerencia.");}catch{if(epoch===authEpoch)message("No se pudo activar la cuenta. Comprueba tu perfil o contacta a gerencia.")}
+ }
+ if(profile){panel.append(node("h2","Mi perfil institucional"),node("p",profile.full_name+" · "+profile.specialty+" · "+profile.job_title),node("p","Estado: "+(projects.length?"Activo":profile.state==="rejected"?"Acceso rechazado":"Sin acceso activo")))}
  else if(!projects.length){
   const form=node("form"),name=fieldControl("Nombres y apellidos","text"),specialty=fieldControl("Profesión o especialidad","text"),title=fieldControl("Cargo en FUNDAINIL","text");
   for(const [x,min,max] of [[name,3,160],[specialty,2,120],[title,2,120]]){x.e.required=true;x.e.minLength=min;x.e.maxLength=max}
-  const b=node("button","Solicitar acceso institucional","btn wide");b.type="submit";
-  form.append(name.l,specialty.l,title.l,b);panel.append(node("h2","Completa tu perfil profesional"),node("p","Tu cuenta es institucional. Gerencia asignará los permisos; no debes seleccionar un proyecto al registrarte."),form);
-  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{await rpc("hh_request_staff_access",{p_name:name.e.value,p_specialty:specialty.e.value,p_title:title.e.value});if(epoch===authEpoch){message("Solicitud registrada. Gerencia debe autorizar tu acceso.");await renderStaff()}}catch{if(epoch===authEpoch){message("No se pudo registrar la solicitud. Comprueba que tu correo esté confirmado.");b.disabled=false}}};
+  const btn=node("button","Activar mi cuenta","btn wide");btn.type="submit";
+  form.append(name.l,specialty.l,title.l,btn);panel.append(node("h2","Completa tu perfil profesional"),node("p","El acceso de campo se activa automáticamente con tu correo confirmado."),form);
+  form.onsubmit=async e=>{e.preventDefault();btn.disabled=true;try{await rpc("hh_request_staff_access",{p_name:name.e.value,p_specialty:specialty.e.value,p_title:title.e.value});if(epoch!==authEpoch)return;projects=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;renderProjects();await renderStaff();message(projects.length?"Cuenta activa.":"Sin acceso activo. Contacta a gerencia.")}catch{if(epoch===authEpoch){message("No se pudo activar la cuenta.");btn.disabled=false}}};
  }
- if(!projects.length){const b=node("button","Actualizar estado de acceso","btn secondary");b.type="button";b.onclick=async()=>{try{const fresh=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;projects=fresh;renderProjects();await renderStaff();message(projects.length?"Acceso autorizado.":"La cuenta aún no tiene permisos activos.")}catch{if(epoch===authEpoch)message("No se pudo consultar el estado.")}};panel.append(b)}
+ if(!projects.length){const btn=node("button","Actualizar estado de acceso","btn secondary");btn.type="button";btn.onclick=async()=>{try{const fresh=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;projects=fresh;renderProjects();await renderStaff()}catch{if(epoch===authEpoch)message("No se pudo consultar el estado.")}};panel.append(btn)}
  for(const p of projects.filter(x=>x.member_role==="manager"&&x.project_code==="EDUCO-SANDBOX")){
-  const admin=node("section",null,"card"),out=node("div"),load=node("button","Actualizar solicitudes","btn secondary");load.type="button";
+  const admin=node("section",null,"card"),out=node("div"),load=node("button","Actualizar directorio","btn secondary");load.type="button";
   const registrationURL="https://humanhub-sandbox.vercel.app/registro",link=node("a","Abrir registro de profesionales","btn secondary"),copy=node("button","Copiar enlace para el equipo","btn");link.href=registrationURL;link.target="_blank";link.rel="noopener noreferrer";copy.type="button";copy.onclick=async()=>{try{await navigator.clipboard.writeText(registrationURL);message("Enlace de registro copiado.")}catch{message("Comparte este enlace: "+registrationURL)}};
   const invite=node("div",null,"actions");invite.append(copy,link);
-  admin.append(node("h2","Administración de profesionales"),node("p","Comparte el enlace con campo, coordinación y MERA. Cada persona crea su cuenta; después podrás aprobar su solicitud y asignarle el rol."),node("p",registrationURL,"section-caption"),invite,node("p","Verifica la identidad y relación laboral antes de aprobar. No se asigna gerencia desde esta pantalla.","section-caption"),load,out);panel.append(admin);
-  async function list(){load.disabled=true;try{const req=await rpc("hh_staff_requests",{p_project:p.project_id});if(epoch!==authEpoch)return;out.replaceChildren();if(!req.length){out.append(node("p","No hay solicitudes pendientes."));return}for(const r of req){const box=node("div",null,"card"),role=fieldControl("Perfil autorizado","select",[["field","Profesional de campo"],["coordinator","Coordinación"],["monitoring","MERA"]]);box.append(node("h3",r.full_name),node("p",r.email),node("p",r.specialty+" · "+r.job_title),role.l);for(const [approve,label] of [[true,"Aprobar acceso"],[false,"Rechazar solicitud"]]){const b=node("button",label,"btn secondary");b.type="button";b.onclick=async()=>{if(!confirm(label+" para "+r.full_name+"?"))return;b.disabled=true;try{await rpc("hh_review_staff_request",{p_project:p.project_id,p_user:r.user_id,p_role:role.e.value,p_approve:approve});if(epoch===authEpoch){message("Decisión registrada.");await list()}}catch{if(epoch===authEpoch){message("No se pudo registrar la decisión.");b.disabled=false}}};box.append(b)}out.append(box)}}catch{if(epoch===authEpoch)out.textContent="No se pudieron consultar las solicitudes."}finally{if(epoch===authEpoch)load.disabled=false}}
+  admin.append(node("h2","Administración de profesionales"),node("p","Las cuentas con correo confirmado se activan automáticamente como Campo. Cambia roles o suspende accesos desde este directorio; se conserva el historial."),invite,load,out);panel.append(admin);
+  async function list(){load.disabled=true;try{
+   const req=await rpc("hh_staff_directory",{p_project:p.project_id});if(epoch!==authEpoch)return;out.replaceChildren();
+   if(!req.length){out.append(node("p","Aún no hay otros perfiles registrados."));return}
+   for(const r of req){const box=node("div",null,"card");box.append(node("h3",r.full_name),node("p",r.email),node("p",r.specialty+" · "+r.job_title),node("p",r.active?"Acceso activo":r.member_role?"Acceso suspendido":"Sin acceso activo"));
+    if(["field","coordinator","monitoring"].includes(r.member_role)){
+     const role=fieldControl("Perfil autorizado","select",[["field","Profesional de campo"],["coordinator","Coordinación"],["monitoring","MERA"]]);role.e.value=r.member_role;box.append(role.l);
+     const controls=node("div",null,"actions");
+     for(const [active,label] of [[r.active,"Guardar rol"],[!r.active,r.active?"Suspender acceso":"Reactivar acceso"]]){
+      const btn=node("button",label,"btn secondary");btn.type="button";btn.onclick=async()=>{if(!confirm(label+" para "+r.full_name+"?"))return;btn.disabled=true;try{await rpc("hh_manage_staff_access",{p_project:p.project_id,p_user:r.user_id,p_role:role.e.value,p_active:active});if(epoch===authEpoch){message("Permisos actualizados.");await list()}}catch{if(epoch===authEpoch){message("No se pudieron actualizar los permisos.");btn.disabled=false}}};controls.append(btn)
+     }box.append(controls)
+    }out.append(box)
+   }
+  }catch{if(epoch===authEpoch)out.textContent="No se pudo consultar el directorio."}finally{if(epoch===authEpoch)load.disabled=false}}
   load.onclick=list;await list();
  }
 }
@@ -221,7 +237,7 @@ $("login-form").addEventListener("submit",async e=>{
   if(epoch!==authEpoch)return;
   if(!Array.isArray(rows))throw Error("Invalid access result");
   projects=rows;
-  $("signin").hidden=true;$("enrollment").hidden=true;$("workspace").hidden=false;renderProjects();message(rows.length?"Sesión autenticada.":"Cuenta autenticada. Completa o consulta tu solicitud de acceso.");await renderStaff();if(epoch!==authEpoch)return;
+  $("signin").hidden=true;$("enrollment").hidden=true;$("workspace").hidden=false;renderProjects();message(rows.length?"Sesión autenticada.":"Cuenta autenticada. Activando tu perfil.");await renderStaff(data.user?.user_metadata??{});if(epoch!==authEpoch)return;
   const requested=({campo:"field",coordinacion:"coord",mera:"mera"})[location.pathname.split("/").filter(Boolean).pop()];if(requested){const p=projects.find(x=>x.project_code==="EDUCO-SANDBOX"&&({field:x.field_access,coord:x.coord_access,mera:x.mera_access}[requested]));if(p)await openPilot(p.project_id,requested);else message("Tu cuenta no tiene permiso para este módulo.")}
   const duration=Math.min(15*60,Math.max(1,Number(data.expires_in)||60));expiryTimer=setTimeout(()=>reset("La sesión ha expirado. Vuelve a ingresar."),duration*1000);
  }catch(e){if(epoch===authEpoch)reset("No se pudo iniciar sesión o verificar los permisos. Revisa tus credenciales o contacta a administración.")}
@@ -233,11 +249,12 @@ $("signup-form").addEventListener("submit",async e=>{
  if(pass!==repeat||pass.length<12){message("Las contraseñas deben coincidir y tener al menos 12 caracteres.");return}
  b.disabled=true;
  try{
-  await api("/auth/v1/signup?redirect_to="+encodeURIComponent("https://humanhub-sandbox.vercel.app/acceso"),"POST",{email,password:pass},null);
+  await api("/auth/v1/signup?redirect_to="+encodeURIComponent("https://humanhub-sandbox.vercel.app/acceso"),"POST",{email,password:pass,data:{hh_name:$("signup-name").value.trim(),hh_specialty:$("signup-specialty").value.trim(),hh_title:$("signup-title").value.trim()}},null);
   $("signup-password").value=$("signup-repeat").value="";$("email").value=email;$("enrollment").hidden=true;$("signin").hidden=false;
-  message("Solicitud de cuenta enviada. Si recibes el correo de confirmación, confirma tu dirección e inicia sesión. Si no llega, consulta a administración.");
+  message("Cuenta solicitada. Confirma el correo e inicia sesión; tu acceso de campo se activará automáticamente. Si no llega, usa Reenviar confirmación.");
  }catch{message("No se pudo completar el registro. La cuenta puede existir o la configuración de correo puede requerir revisión. Contacta a administración.")}finally{b.disabled=false}
 });
+$("resend-confirmation").onclick=async()=>{const email=$("email").value.trim();if(!email||!$("email").checkValidity()){message("Introduce el correo de tu cuenta.");return}const b=$("resend-confirmation");b.disabled=true;try{await api("/auth/v1/resend?redirect_to="+encodeURIComponent("https://humanhub-sandbox.vercel.app/acceso"),"POST",{type:"signup",email},null);message("Solicitud de reenvío enviada. Revisa tu correo y spam.")}catch{message("No se pudo reenviar. Puede existir una restricción de envío; contacta a administración.")}finally{b.disabled=false}};
 if(location.hash){history.replaceState(null,"",location.pathname+location.search);message("Si confirmaste tu correo, inicia sesión con tu contraseña.")}else if(location.pathname.replace(/\/+$/,"")==="/registro"){$("show-signup").click()}
 $("logout").addEventListener("click",async()=>{const old=accessToken;reset("Sesión local cerrada.");if(old){try{await api("/auth/v1/logout","POST",undefined,old)}catch{message("Sesión local cerrada. No se pudo confirmar la revocación remota.")}}});
 window.addEventListener("pagehide",()=>{reset("")});
