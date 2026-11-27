@@ -13,20 +13,40 @@
       "destination": "/asistencia.html"
     },
     {
+      "source": "/demo",
+      "destination": "/demo.html"
+    },
+    {
+      "source": "/demo/educo",
+      "destination": "/demo.html"
+    },
+    {
+      "source": "/demo/educo/campo",
+      "destination": "/demo.html"
+    },
+    {
+      "source": "/demo/educo/coordinacion",
+      "destination": "/demo.html"
+    },
+    {
+      "source": "/demo/educo/mera",
+      "destination": "/demo.html"
+    },
+    {
       "source": "/educo",
-      "destination": "/index.html"
+      "destination": "/acceso.html"
     },
     {
       "source": "/educo/campo",
-      "destination": "/index.html"
+      "destination": "/acceso.html"
     },
     {
       "source": "/educo/coordinacion",
-      "destination": "/index.html"
+      "destination": "/acceso.html"
     },
     {
       "source": "/educo/mera",
-      "destination": "/index.html"
+      "destination": "/acceso.html"
     }
   ],
   "headers": [
@@ -53,6 +73,15 @@
     },
     {
       "source": "/acceso",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "no-store"
+        }
+      ]
+    },
+    {
+      "source": "/",
       "headers": [
         {
           "key": "Cache-Control",
