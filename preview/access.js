@@ -24,7 +24,7 @@ function renderProjects(){
   const box=node("section",null,"card");box.append(node("h2",p.project_name),node("p","Rol asignado: "+({field:"Campo",coordinator:"Coordinación",monitoring:"MERA",manager:"Gerencia",director:"Dirección",auditor:"Auditoría"}[p.member_role]??"No reconocido")));
   const grid=node("div",null,"grid three");
   for(const [allowed,label,mode] of [[p.field_access,"Reporte de campo","field"],[p.coord_access,"Coordinación","coord"],[p.mera_access,"MERA","mera"]]){
-   const card=node("div",null,"tile");card.append(node("h3",label),node("p",allowed?"Rol autorizado · circuito de pruebas":"Sin permiso para este módulo"),node("span",allowed?"Autorizado":"Restringido","tag "+(allowed?"green":"orange")));if(allowed&&p.project_code==="EDUCO-SANDBOX"){const b=node("button","Abrir módulo","btn");b.type="button";b.onclick=()=>openPilot(p.project_id,mode);card.append(b)}grid.append(card);
+   const card=node("div",null,"tile");card.append(node("h3",label),node("p",allowed?"Permiso institucional activo · consulta las condiciones del módulo":"Sin permiso para este módulo"),node("span",allowed?"Autorizado":"Restringido","tag "+(allowed?"green":"orange")));if(allowed&&p.project_code==="EDUCO-SANDBOX"){const b=node("button","Abrir módulo","btn");b.type="button";b.onclick=()=>openPilot(p.project_id,mode);card.append(b)}grid.append(card);
   }
   box.append(grid);
   const b=node("button","Consultar catálogo en Supabase","btn secondary");b.type="button";b.addEventListener("click",()=>readCatalog(p.project_id));box.append(b);container.append(box);
@@ -66,7 +66,10 @@ async function renderStaff(){
  }
  if(!projects.length){const b=node("button","Actualizar estado de acceso","btn secondary");b.type="button";b.onclick=async()=>{try{const fresh=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;projects=fresh;renderProjects();await renderStaff();message(projects.length?"Acceso autorizado.":"La cuenta aún no tiene permisos activos.")}catch{if(epoch===authEpoch)message("No se pudo consultar el estado.")}};panel.append(b)}
  for(const p of projects.filter(x=>x.member_role==="manager"&&x.project_code==="EDUCO-SANDBOX")){
-  const admin=node("section",null,"card"),out=node("div"),load=node("button","Actualizar solicitudes","btn secondary");load.type="button";admin.append(node("h2","Administración de profesionales"),node("p","Verifica la identidad y relación laboral antes de aprobar. No se asigna gerencia desde esta pantalla."),load,out);panel.append(admin);
+  const admin=node("section",null,"card"),out=node("div"),load=node("button","Actualizar solicitudes","btn secondary");load.type="button";
+  const registrationURL="https://humanhub-sandbox.vercel.app/registro",link=node("a","Abrir registro de profesionales","btn secondary"),copy=node("button","Copiar enlace para el equipo","btn");link.href=registrationURL;link.target="_blank";link.rel="noopener noreferrer";copy.type="button";copy.onclick=async()=>{try{await navigator.clipboard.writeText(registrationURL);message("Enlace de registro copiado.")}catch{message("Comparte este enlace: "+registrationURL)}};
+  const invite=node("div",null,"actions");invite.append(copy,link);
+  admin.append(node("h2","Administración de profesionales"),node("p","Comparte el enlace con campo, coordinación y MERA. Cada persona crea su cuenta; después podrás aprobar su solicitud y asignarle el rol."),node("p",registrationURL,"section-caption"),invite,node("p","Verifica la identidad y relación laboral antes de aprobar. No se asigna gerencia desde esta pantalla.","section-caption"),load,out);panel.append(admin);
   async function list(){load.disabled=true;try{const req=await rpc("hh_staff_requests",{p_project:p.project_id});if(epoch!==authEpoch)return;out.replaceChildren();if(!req.length){out.append(node("p","No hay solicitudes pendientes."));return}for(const r of req){const box=node("div",null,"card"),role=fieldControl("Perfil autorizado","select",[["field","Profesional de campo"],["coordinator","Coordinación"],["monitoring","MERA"]]);box.append(node("h3",r.full_name),node("p",r.email),node("p",r.specialty+" · "+r.job_title),role.l);for(const [approve,label] of [[true,"Aprobar acceso"],[false,"Rechazar solicitud"]]){const b=node("button",label,"btn secondary");b.type="button";b.onclick=async()=>{if(!confirm(label+" para "+r.full_name+"?"))return;b.disabled=true;try{await rpc("hh_review_staff_request",{p_project:p.project_id,p_user:r.user_id,p_role:role.e.value,p_approve:approve});if(epoch===authEpoch){message("Decisión registrada.");await list()}}catch{if(epoch===authEpoch){message("No se pudo registrar la decisión.");b.disabled=false}}};box.append(b)}out.append(box)}}catch{if(epoch===authEpoch)out.textContent="No se pudieron consultar las solicitudes."}finally{if(epoch===authEpoch)load.disabled=false}}
   load.onclick=list;await list();
  }
@@ -208,7 +211,7 @@ $("login-form").addEventListener("submit",async e=>{
   if(!Array.isArray(rows))throw Error("Invalid access result");
   projects=rows;
   $("signin").hidden=true;$("enrollment").hidden=true;$("workspace").hidden=false;renderProjects();message(rows.length?"Sesión autenticada.":"Cuenta autenticada. Completa o consulta tu solicitud de acceso.");await renderStaff();if(epoch!==authEpoch)return;
-  const duration=Math.min(15*60,Math.max(1,Number(data.expires_in)||60));expiryTimer=setTimeout(()=>reset("La sesión de prueba ha expirado. Vuelve a ingresar."),duration*1000);
+  const duration=Math.min(15*60,Math.max(1,Number(data.expires_in)||60));expiryTimer=setTimeout(()=>reset("La sesión ha expirado. Vuelve a ingresar."),duration*1000);
  }catch(e){if(epoch===authEpoch)reset("No se pudo iniciar sesión o verificar los permisos. Revisa tus credenciales o contacta a administración.")}
 });
 $("show-signup").onclick=()=>{$("enrollment").hidden=false;$("signin").hidden=true;message("");$("signup-email").focus()};
@@ -223,6 +226,6 @@ $("signup-form").addEventListener("submit",async e=>{
   message("Solicitud de cuenta enviada. Si recibes el correo de confirmación, confirma tu dirección e inicia sesión. Si no llega, consulta a administración.");
  }catch{message("No se pudo completar el registro. La cuenta puede existir o la configuración de correo puede requerir revisión. Contacta a administración.")}finally{b.disabled=false}
 });
-if(location.hash){history.replaceState(null,"",location.pathname+location.search);message("Si confirmaste tu correo, inicia sesión con tu contraseña.")}
+if(location.hash){history.replaceState(null,"",location.pathname+location.search);message("Si confirmaste tu correo, inicia sesión con tu contraseña.")}else if(location.pathname.replace(/\/+$/,"")==="/registro"){$("show-signup").click()}
 $("logout").addEventListener("click",async()=>{const old=accessToken;reset("Sesión local cerrada.");if(old){try{await api("/auth/v1/logout","POST",undefined,old)}catch{message("Sesión local cerrada. No se pudo confirmar la revocación remota.")}}});
 window.addEventListener("pagehide",()=>{reset("")});
