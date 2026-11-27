@@ -63,6 +63,50 @@ function dataTable(headers,rows){
  rows.forEach(row=>{const r=node("tr");row.forEach(x=>{const c=node("td");if(x instanceof Node)c.append(x);else c.textContent=String(x??"");r.append(c)});body.append(r)});
  const wrap=node("div",null,"scroll");wrap.append(t);return wrap;
 }
+
+/* Two optional activity-evidence photos. Re-encode in memory; do not keep original files or metadata. */
+function evidencePicker(container){
+ const doc=document, rows=[null,null], states=[], pending=[false,false];
+ const el=(tag,text,cls)=>{const e=doc.createElement(tag);if(text!=null)e.textContent=text;if(cls)e.className=cls;return e};
+ const grid=el("div",null,"grid"),notice=el("p","Solo imágenes de prueba, sin rostros, listas, nombres ni información personal. Máximo dos fotos JPEG, PNG o WebP. Cada imagen requiere una descripción.","section-caption");container.append(notice,grid);
+ const encode=async file=>{
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)||file.size>10*1024*1024)throw Error("Formato no admitido o archivo superior a 10 MB.");
+  const url=URL.createObjectURL(file);
+  try{
+   const img=new Image();img.src=url;await img.decode();
+   if(!img.naturalWidth||!img.naturalHeight||img.naturalWidth*img.naturalHeight>40000000)throw Error("Imagen demasiado grande.");
+   const canvas=doc.createElement("canvas");let scale=Math.min(1,1200/Math.max(img.naturalWidth,img.naturalHeight));
+   for(let i=0;i<5;i++){
+    canvas.width=Math.max(1,Math.round(img.naturalWidth*scale));canvas.height=Math.max(1,Math.round(img.naturalHeight*scale));
+    const ctx=canvas.getContext("2d");ctx.fillStyle="#fff";ctx.fillRect(0,0,canvas.width,canvas.height);ctx.drawImage(img,0,0,canvas.width,canvas.height);
+    const data=canvas.toDataURL("image/jpeg",0.75);
+    if(data.startsWith("data:image/jpeg;base64,")&&data.length<=349000)return data;
+    scale*=0.75;
+   }
+   throw Error("No se pudo reducir la imagen.");
+  }finally{URL.revokeObjectURL(url)}
+ };
+ for(let i=0;i<2;i++){
+  let epoch=0;const box=el("div",null,"upload evidence-slot"),img=el("img",null,"evidence-preview"),caption=el("input"),msg=el("p",null,"section-caption"),buttons=el("div",null,"actions");
+  img.alt="Vista previa de evidencia "+(i+1);img.hidden=true;caption.placeholder="Descripción breve de la actividad";caption.maxLength=240;caption.setAttribute("aria-label","Descripción de foto "+(i+1));caption.hidden=true;
+  const camera=el("input"),gallery=el("input");for(const inp of [camera,gallery]){inp.type="file";inp.accept="image/jpeg,image/png,image/webp";inp.hidden=true}camera.setAttribute("capture","environment");
+  const pick=(text,inp)=>{const b=el("button",text,"btn secondary");b.type="button";b.onclick=()=>inp.click();return b};
+  const clear=el("button","Quitar foto","btn secondary");clear.type="button";clear.hidden=true;
+  const reset=()=>{epoch++;pending[i]=false;rows[i]=null;img.removeAttribute("src");img.hidden=true;caption.value="";caption.hidden=true;clear.hidden=true;msg.textContent="";camera.value=gallery.value=""};
+  clear.onclick=reset;
+  const load=async e=>{const file=e.target.files?.[0];e.target.value="";if(!file)return;reset();const request=++epoch;pending[i]=true;msg.textContent="Preparando fotografía…";try{const data=await encode(file);if(request!==epoch)return;rows[i]=data;img.src=data;img.hidden=false;caption.hidden=false;clear.hidden=false;msg.textContent="Foto lista. Añade una descripción."}catch(err){if(request===epoch)msg.textContent=err.message||"No se pudo leer la foto."}finally{if(request===epoch)pending[i]=false}};
+  camera.onchange=gallery.onchange=load;
+  buttons.append(pick("Tomar foto",camera),pick("Adjuntar",gallery),clear);
+  box.append(el("strong","Evidencia "+(i+1)),img,caption,buttons,camera,gallery,msg);grid.append(box);states.push({caption,reset});
+ }
+ return {clear:()=>states.forEach(s=>s.reset()),get:()=>{if(pending.some(Boolean))throw Error("Espera a que las fotografías estén listas.");return rows.flatMap((data,i)=>{if(!data)return [];const caption=states[i].caption.value.trim();if(!caption)throw Error("Añade una descripción a cada fotografía.");return [{jpeg:data.split(",")[1],caption}]})}};
+}
+async function appendEvidence(doc,photos){
+ if(!photos.length)return;
+ const h=document.createElement("h2");h.textContent="Evidencias fotográficas";doc.append(h);
+ for(const p of photos){const figure=document.createElement("figure"),img=document.createElement("img"),cap=document.createElement("figcaption");figure.className="evidence-figure";img.src="data:image/jpeg;base64,"+(p.jpeg??p.jpeg_base64);img.alt=p.caption;cap.textContent=p.caption;figure.append(img,cap);doc.append(figure);try{await img.decode()}catch{img.remove();cap.textContent+=" (imagen no disponible)"}}
+}
+
 async function openPilot(project,mode){
  const epoch=authEpoch,pe=++panelEpoch,panel=$("pilot-panel");if(!accessToken)return;
  const alive=()=>epoch===authEpoch&&pe===panelEpoch&&!!accessToken;
@@ -72,7 +116,7 @@ async function openPilot(project,mode){
   const member=access.find(p=>p.project_id===project&&p.project_code==="EDUCO-SANDBOX");
   if(!member||!({field:member.field_access,coord:member.coord_access,mera:member.mera_access}[mode])){panel.replaceChildren(node("p","No tienes acceso activo a este módulo.","notice"));return}
   const section=node("section",null,"card"),output=node("div"),status=node("p",null,"status");
-  section.append(node("h2",({field:"Reporte de campo · prueba persistente",coord:"Coordinación · revisión de reportes",mera:"MERA · sesiones validadas"})[mode]),node("p","SOLO PRUEBAS FICTICIAS. No ingreses nombres, listas, fotografías ni información real de participantes.","notice"));
+  section.append(node("h2",({field:"Reporte de campo · prueba persistente",coord:"Coordinación · revisión de reportes",mera:"MERA · sesiones validadas"})[mode]),node("p","SOLO PRUEBAS FICTICIAS. No ingreses nombres, listas ni fotografías de personas reales. Usa imágenes de materiales de prueba.","notice"));
   panel.replaceChildren(section);
   async function listReports(){
    const data=await rpc("hh_pilot_reports",{p_project:project});if(!alive())return;
@@ -80,6 +124,7 @@ async function openPilot(project,mode){
    if(!data.length){output.append(node("p","No hay reportes registrados.","empty"));return}
    const rows=data.map(r=>{
     const detail=node("div");detail.append(node("p",r.strategy),node("p","Resultado: "+(r.achievements||"No informado")),node("p","Dificultades: "+(r.challenges||"No informadas")),node("p","Revisión: "+(r.review_note||"Sin observaciones")));
+    const evidence=node("div");const show=node("button","Ver evidencias","btn secondary");show.type="button";show.onclick=async()=>{show.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;evidence.replaceChildren();if(photos.length)await appendEvidence(evidence,photos);else evidence.append(node("p","Sin fotografías adjuntas.","section-caption"))}catch{if(alive())evidence.textContent="No se pudieron consultar las evidencias."}finally{if(alive())show.disabled=false}};detail.append(show,evidence);
     const ctl=node("div");
     if(mode==="coord"&&r.can_review){
      const note=fieldControl("Observación de revisión (ficticia)","textarea");ctl.append(note.l);
@@ -106,8 +151,8 @@ async function openPilot(project,mode){
    const consent=node("label",null,"check"),check=node("input");check.type="checkbox";check.required=true;consent.append(check,document.createTextNode(" Confirmo que todos los datos son inventados para la prueba."));
    grid.append(activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
    const button=node("button","Enviar reporte a revisión","btn wide");button.type="submit";
-   form.append(node("p",opts[0].space_label),grid,consent,button);
-   form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];button.disabled=true;try{await rpc("hh_pilot_submit",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value});if(alive()){strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
+   const photoBlock=node("section",null,"card");photoBlock.append(node("h3","Evidencias fotográficas (opcional)"));const picker=evidencePicker(photoBlock);form.append(node("p",opts[0].space_label),grid,photoBlock,consent,button);
+   form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];let photos;try{photos=picker.get()}catch(err){status.textContent=err.message;return}button.disabled=true;try{await rpc("hh_pilot_submit_photos",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value,p_photos:photos});if(alive()){picker.clear();strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
    section.append(form,status,output);await listReports();
   }else if(mode==="coord"){section.append(status,output);await listReports()}
   else{
