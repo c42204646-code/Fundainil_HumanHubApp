@@ -2,3 +2,5 @@
 .project-grid:has(.project-tile){grid-template-columns:minmax(0,320px);justify-content:center}.project-tile{width:100%}
 
 .print-only{display:none}#print-report{padding:20px;font:12pt/1.65 system-ui;color:#13243a}#print-report div{white-space:pre-wrap;overflow-wrap:anywhere}@media print{body:has(#print-report) main{display:none}#print-report{display:block!important}#print-report h1{font-size:17pt;border-bottom:1px solid #cbd5e1;padding-bottom:12px}}
+
+.chart-scroll{overflow-x:auto;margin:12px 0 6px}.chart-scroll svg{width:100%;height:auto;min-width:300px;display:block;max-height:380px}.quick-queries{background:#f4f8fc;border:1px solid #dfe8f2;border-radius:10px;padding:15px;margin:15px 0}.quick-queries .btn{font-size:12px;white-space:normal;text-align:left;justify-content:flex-start}.quick-queries .actions{gap:7px}#exp-output{margin-top:18px}#exp-output .chart-scroll svg{max-height:510px}#exp-output .notice{background:#edf6fc;color:#164b70;border-color:#d7e8f4}@media(max-width:600px){.chart-scroll svg{min-width:290px}.quick-queries .btn{width:100%}}
