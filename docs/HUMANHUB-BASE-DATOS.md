@@ -1,0 +1,19 @@
+# HumanHub: registro longitudinal y seguridad
+Estado: esquema de pruebas aplicado en Supabase. El frontend de Vercel continúa como demostración estática; no existe aún una API autorizada de producción.
+## Metodología
+- Identidad institucional: código aleatorio estable; coincidencias de identidad requieren verificación humana. La huella HMAC de un identificador fiable es opcional; no usar nombres como identificador único, ni hashing sin clave. No se ha configurado un almacén de datos nominales ni claves HMAC.
+- Programa y actividad: claves estables por proyecto. Códigos del marco lógico vinculados a fase. No fusionar actividades entre fases sin validación metodológica.
+- Sesión: proyecto, espacio, fecha, turno y slot. Una participación válida por identificador y sesión. La asignación de sesiones canónicas requiere supervisión.
+- Nuevo: primera atención histórica dentro del ámbito. Recurrente: dos o más participaciones hasta el corte. Retornante: primera atención anterior al inicio del período. Nuevo y recurrente pueden coincidir si la primera y segunda asistencia ocurren dentro del período.
+- El historial se ordena por fecha, turno, slot e ID como desempate determinista, no por fecha de importación. Sesiones simultáneas no tienen un orden horario real adicional; si se necesita, registrar horas.
+- Para cortes por programa, actividad, comunidad o fase, no reiniciar historial en los filtros; la recurrencia se refiere al ámbito histórico del proyecto/programa/actividad. Los totales por grupos de programa/actividad se superponen. En desagregación de personas únicas usar la última observación elegible dentro del período; desconocido nunca se interpreta como no. Las asistencias agrupadas por la última observación son una atribución de cohorte, no un conteo de características por visita.
+- Solo lotes validados alimentan attendance_history. La aprobación transaccional bloquea duplicados, requiere un revisor distinto y activo y registra auditoría. Correcciones posteriores requerirán una operación auditada todavía no implementada.
+## Privacidad
+24 tablas con RLS y sin permisos para anon/authenticated/service_role; no se ha expuesto el esquema por Data API. El aviso RLS sin políticas es esperado en esta etapa de bloqueo. Las funciones son SECURITY INVOKER y no se otorga EXECUTE a clientes. Implementar API con autorización basada en token verificado y membresía de proyecto, rol de backend con permisos mínimos, no aceptar actor_id desde el navegador. No enviar IDs ni datos nominales a MERA. Supresión de celdas pequeñas y limitación de consultas serán necesarias antes de datos reales.
+OCR: tablas de intake y resolución sin imagen ni texto nominal; no retener fotos ni extraer atributos no registrados. La captura y el enlace entre fila OCR y lote aprobado todavía necesitan servicio de conciliación y validación de filas pendientes, almacenamiento privado si se autoriza y política de retención. No implica reconocimiento automático ni identidad garantizada.
+## Indicadores
+La base permite vínculos entre actividad e indicador, metas versionadas por fase/periodo y observaciones con numerador/denominador o valor. No se han cargado metas ni registros reales. La agregación por tipo de indicador (únicos, eventos, stock, tasas), control de evidencia y aprobación de informes deben integrarse por separado.
+## Pruebas
+supabase/tests/longitudinal_recurrence.sql: fixture transaccional revertido tras comprobar deduplicación, revisión, orden histórico, recurrencia por programa/actividad y cortes demográficos. Ejecutar únicamente en sandbox. No volver a aplicar migraciones ya registradas.
+## Pendientes
+Usuarios individuales y API, catálogo Educo revisado, conciliación OCR, correcciones y fusiones auditadas, integración con MERA, rendimiento con volumen, privacidad, backups y recuperación. No incorporar información real antes de validar estos controles.
