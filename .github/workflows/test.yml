@@ -30,3 +30,6 @@ jobs:
 
       - run: node --check preview/portal.js
       - run: test -f sandbox-dist/intelligence/educo-logo.svg && test -f sandbox-dist/intelligence/portal.js
+
+      - run: node --check preview/access.js
+      - run: test -f sandbox-dist/acceso.html && test -f sandbox-dist/intelligence/access.js
