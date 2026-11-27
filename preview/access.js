@@ -15,7 +15,7 @@ async function api(path,method="GET",payload,token=accessToken){
 }
 function reset(text){
  authEpoch++;panelEpoch++;accessToken=null;projects=[];clearTimeout(expiryTimer);
- if($("pilot-panel"))$("pilot-panel").replaceChildren();$("workspace").hidden=true;$("signin").hidden=false;$("projects").replaceChildren();$("catalog-content").replaceChildren();$("catalog").hidden=true;$("password").value="";$("login").disabled=false;
+ if($("pilot-panel"))$("pilot-panel").replaceChildren();$("staff-panel").replaceChildren();$("staff-panel").hidden=true;$("enrollment").hidden=true;$("signup-password").value="";$("signup-repeat").value="";$("signup-submit").disabled=false;$("workspace").hidden=true;$("signin").hidden=false;$("projects").replaceChildren();$("catalog-content").replaceChildren();$("catalog").hidden=true;$("password").value="";$("login").disabled=false;
  message(text??"");
 }
 function renderProjects(){
@@ -49,6 +49,27 @@ async function readCatalog(projectId){
 }
 
 const rpc=(name,payload)=>api("/rest/v1/rpc/"+name,"POST",payload);
+const projectPhase=phase=>({original:"Educo · Proyecto original",expansion:"Educo · Proyecto de ampliación",shared:"Educo · Atribución compartida"}[phase]??"Educo · Fase no definida");
+async function renderStaff(){
+ const epoch=authEpoch, panel=$("staff-panel");panel.hidden=false;panel.replaceChildren();
+ const rows=await rpc("hh_my_staff_profile",{});if(epoch!==authEpoch)return;
+ const profile=rows[0];
+ if(profile){panel.append(node("h2","Mi perfil institucional"),node("p",profile.full_name+" · "+profile.specialty+" · "+profile.job_title),node("p","Estado: "+({pending:"Pendiente de aprobación por gerencia",approved:"Aprobado",rejected:"Solicitud no aprobada"}[profile.state]??profile.state)))}
+ else if(!projects.length){
+  const form=node("form"),name=fieldControl("Nombres y apellidos","text"),specialty=fieldControl("Profesión o especialidad","text"),title=fieldControl("Cargo en FUNDAINIL","text");
+  for(const [x,min,max] of [[name,3,160],[specialty,2,120],[title,2,120]]){x.e.required=true;x.e.minLength=min;x.e.maxLength=max}
+  const b=node("button","Solicitar acceso institucional","btn wide");b.type="submit";
+  form.append(name.l,specialty.l,title.l,b);panel.append(node("h2","Completa tu perfil profesional"),node("p","Tu cuenta es institucional. Gerencia asignará los permisos; no debes seleccionar un proyecto al registrarte."),form);
+  form.onsubmit=async e=>{e.preventDefault();b.disabled=true;try{await rpc("hh_request_staff_access",{p_name:name.e.value,p_specialty:specialty.e.value,p_title:title.e.value});if(epoch===authEpoch){message("Solicitud registrada. Gerencia debe autorizar tu acceso.");await renderStaff()}}catch{if(epoch===authEpoch){message("No se pudo registrar la solicitud. Comprueba que tu correo esté confirmado.");b.disabled=false}}};
+ }
+ if(!projects.length){const b=node("button","Actualizar estado de acceso","btn secondary");b.type="button";b.onclick=async()=>{try{const fresh=await rpc("hh_my_access",{});if(epoch!==authEpoch)return;projects=fresh;renderProjects();await renderStaff();message(projects.length?"Acceso autorizado.":"La cuenta aún no tiene permisos activos.")}catch{if(epoch===authEpoch)message("No se pudo consultar el estado.")}};panel.append(b)}
+ for(const p of projects.filter(x=>x.member_role==="manager"&&x.project_code==="EDUCO-SANDBOX")){
+  const admin=node("section",null,"card"),out=node("div"),load=node("button","Actualizar solicitudes","btn secondary");load.type="button";admin.append(node("h2","Administración de profesionales"),node("p","Verifica la identidad y relación laboral antes de aprobar. No se asigna gerencia desde esta pantalla."),load,out);panel.append(admin);
+  async function list(){load.disabled=true;try{const req=await rpc("hh_staff_requests",{p_project:p.project_id});if(epoch!==authEpoch)return;out.replaceChildren();if(!req.length){out.append(node("p","No hay solicitudes pendientes."));return}for(const r of req){const box=node("div",null,"card"),role=fieldControl("Perfil autorizado","select",[["field","Profesional de campo"],["coordinator","Coordinación"],["monitoring","MERA"]]);box.append(node("h3",r.full_name),node("p",r.email),node("p",r.specialty+" · "+r.job_title),role.l);for(const [approve,label] of [[true,"Aprobar acceso"],[false,"Rechazar solicitud"]]){const b=node("button",label,"btn secondary");b.type="button";b.onclick=async()=>{if(!confirm(label+" para "+r.full_name+"?"))return;b.disabled=true;try{await rpc("hh_review_staff_request",{p_project:p.project_id,p_user:r.user_id,p_role:role.e.value,p_approve:approve});if(epoch===authEpoch){message("Decisión registrada.");await list()}}catch{if(epoch===authEpoch){message("No se pudo registrar la decisión.");b.disabled=false}}};box.append(b)}out.append(box)}}catch{if(epoch===authEpoch)out.textContent="No se pudieron consultar las solicitudes."}finally{if(epoch===authEpoch)load.disabled=false}}
+  load.onclick=list;await list();
+ }
+}
+
 function dateLocal(){const d=new Date();return [d.getFullYear(),String(d.getMonth()+1).padStart(2,"0"),String(d.getDate()).padStart(2,"0")].join("-")}
 function fieldControl(label,type,opts=[]){
  const l=node("label",label),e=node(type==="select"?"select":type==="textarea"?"textarea":"input");
@@ -124,7 +145,7 @@ async function openPilot(project,mode){
    if(!data.length){output.append(node("p","No hay reportes registrados.","empty"));return}
    const rows=data.map(r=>{
     const detail=node("div");detail.append(node("p",r.strategy),node("p","Resultado: "+(r.achievements||"No informado")),node("p","Dificultades: "+(r.challenges||"No informadas")),node("p","Revisión: "+(r.review_note||"Sin observaciones")));
-    const evidence=node("div");const show=node("button","Ver evidencias","btn secondary");show.type="button";show.onclick=async()=>{show.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;evidence.replaceChildren();if(photos.length)await appendEvidence(evidence,photos);else evidence.append(node("p","Sin fotografías adjuntas.","section-caption"))}catch{if(alive())evidence.textContent="No se pudieron consultar las evidencias."}finally{if(alive())show.disabled=false}};const pdf=node("button","Imprimir / PDF","btn secondary");pdf.type="button";pdf.onclick=async()=>{pdf.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;const doc=node("article",null,"print-only");doc.id="print-report";doc.append(node("h1","FUNDAINIL · HumanHub / Educo"),node("p","REPORTE DE PRUEBA · "+r.day+" · "+r.program_code+" · "+r.logical_code+" · "+r.phase),node("p","Estado: "+({review:"Pendiente",validated:"Validado",returned:"Devuelto"}[r.state]??r.state)),node("h2","Estrategia"),node("p",r.strategy),node("h2","Resultados"),node("p",r.achievements||"No informado"),node("h2","Dificultades"),node("p",r.challenges||"No informadas"),node("h2","Observaciones de revisión"),node("p",r.review_note||"Sin observaciones"));document.body.append(doc);try{await appendEvidence(doc,photos);if(alive())window.print()}finally{doc.remove()}}catch{if(alive())status.textContent="No se pudo preparar el informe para impresión."}finally{if(alive())pdf.disabled=false}};detail.append(show,pdf,evidence);
+    const evidence=node("div");const show=node("button","Ver evidencias","btn secondary");show.type="button";show.onclick=async()=>{show.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;evidence.replaceChildren();if(photos.length)await appendEvidence(evidence,photos);else evidence.append(node("p","Sin fotografías adjuntas.","section-caption"))}catch{if(alive())evidence.textContent="No se pudieron consultar las evidencias."}finally{if(alive())show.disabled=false}};const pdf=node("button","Imprimir / PDF","btn secondary");pdf.type="button";pdf.onclick=async()=>{pdf.disabled=true;try{const photos=await rpc("hh_pilot_report_photos",{p_project:project,p_report:r.report_id});if(!alive())return;const doc=node("article",null,"print-only");doc.id="print-report";doc.append(node("h1","FUNDAINIL · HumanHub / Educo"),node("p","REPORTE DE PRUEBA · "+r.day+" · "+r.program_code+" · "+r.logical_code+" · "+projectPhase(r.phase)),node("p","Estado: "+({review:"Pendiente",validated:"Validado",returned:"Devuelto"}[r.state]??r.state)),node("h2","Estrategia"),node("p",r.strategy),node("h2","Resultados"),node("p",r.achievements||"No informado"),node("h2","Dificultades"),node("p",r.challenges||"No informadas"),node("h2","Observaciones de revisión"),node("p",r.review_note||"Sin observaciones"));document.body.append(doc);try{await appendEvidence(doc,photos);if(alive())window.print()}finally{doc.remove()}}catch{if(alive())status.textContent="No se pudo preparar el informe para impresión."}finally{if(alive())pdf.disabled=false}};detail.append(show,pdf,evidence);
     const ctl=node("div");
     if(mode==="coord"&&r.can_review){
      const note=fieldControl("Observación de revisión (ficticia)","textarea");ctl.append(note.l);
@@ -134,7 +155,7 @@ async function openPilot(project,mode){
       ctl.append(b);
      }
     }else ctl.textContent=r.own_report?"Reporte propio":"Sin acción disponible";
-    return [r.day,r.program_code,r.logical_code,r.phase,({review:"Pendiente",validated:"Validado",returned:"Devuelto"})[r.state]??r.state,detail,ctl];
+    return [r.day,r.program_code,r.logical_code,projectPhase(r.phase),({review:"Pendiente",validated:"Validado",returned:"Devuelto"})[r.state]??r.state,detail,ctl];
    });
    output.append(dataTable(["Fecha","Programa","Actividad","Fase","Estado","Detalle","Acción"],rows));
   }
@@ -142,17 +163,20 @@ async function openPilot(project,mode){
    const opts=await rpc("hh_pilot_options",{p_project:project});if(!alive())return;
    if(!opts.length){section.append(node("p","Catálogo no disponible.","notice"));return}
    const form=node("form"),grid=node("div",null,"grid");
-   const activity=fieldControl("Actividad / fase del catálogo de prueba","select",opts.map((o,i)=>[String(i),o.program_label+" · "+o.logical_code+" · "+o.activity_label+" ("+o.phase+")"]));
+   const phase=fieldControl("Proyecto al que corresponde el reporte","select",[["","Selecciona el proyecto"],["original",projectPhase("original")],["expansion",projectPhase("expansion")]]);phase.e.required=true;
+   const activity=fieldControl("Actividad del marco lógico","select",[]);activity.e.required=true;
+   function updateActivities(){activity.e.replaceChildren();const blank=node("option","Selecciona una actividad");blank.value="";activity.e.append(blank);opts.forEach((o,i)=>{if(o.phase===phase.e.value){const x=node("option",o.program_label+" · "+o.logical_code+" · "+o.activity_label);x.value=String(i);activity.e.append(x)}});activity.e.disabled=!phase.e.value;}
+   phase.e.onchange=updateActivities;updateActivities();
    const day=fieldControl("Fecha","date");day.e.value=dateLocal();day.e.max=dateLocal();day.e.required=true;
    const shift=fieldControl("Turno","select",[["AM","Mañana"],["PM","Tarde"]]);
    const slot=fieldControl("Sesión del turno (1–20)","number");slot.e.min="1";slot.e.max="20";slot.e.value="1";slot.e.required=true;
    const strategy=fieldControl("Estrategia ficticia","textarea");strategy.e.required=true;
    const outcome=fieldControl("Resultado ficticio observado","textarea"),challenges=fieldControl("Dificultades ficticias","textarea");
    const consent=node("label",null,"check"),check=node("input");check.type="checkbox";check.required=true;consent.append(check,document.createTextNode(" Confirmo que todos los datos son inventados para la prueba."));
-   grid.append(activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
+   grid.append(phase.l,activity.l,day.l,shift.l,slot.l,strategy.l,outcome.l,challenges.l);
    const button=node("button","Enviar reporte a revisión","btn wide");button.type="submit";
    const photoBlock=node("section",null,"card");photoBlock.append(node("h3","Evidencias fotográficas (opcional)"));const picker=evidencePicker(photoBlock);form.append(node("p",opts[0].space_label),grid,photoBlock,consent,button);
-   form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];let photos;try{photos=picker.get()}catch(err){status.textContent=err.message;return}button.disabled=true;try{await rpc("hh_pilot_submit_photos",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value,p_photos:photos});if(alive()){picker.clear();strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
+   form.onsubmit=async e=>{e.preventDefault();if(!alive()||!check.checked)return;const o=opts[Number(activity.e.value)];if(!phase.e.value||activity.e.value===""||!o||o.phase!==phase.e.value){status.textContent="Selecciona el proyecto y su actividad.";return}let photos;try{photos=picker.get()}catch(err){status.textContent=err.message;return}button.disabled=true;try{await rpc("hh_pilot_submit_photos",{p_project:project,p_space:o.space_id,p_day:day.e.value,p_shift:shift.e.value,p_slot:Number(slot.e.value),p_phase:o.phase,p_program:o.program_code,p_activity:o.activity_key,p_logical:o.logical_code,p_strategy:strategy.e.value,p_outcome:outcome.e.value,p_challenges:challenges.e.value,p_photos:photos});if(alive()){picker.clear();strategy.e.value=outcome.e.value=challenges.e.value="";check.checked=false;status.textContent="Reporte guardado en PostgreSQL y enviado a coordinación.";await listReports()}}catch{if(alive())status.textContent="No se pudo guardar. Revisa el turno y número de sesión (no se admiten duplicados) o tus permisos."}finally{if(alive())button.disabled=false}};
    section.append(form,status,output);await listReports();
   }else if(mode==="coord"){section.append(status,output);await listReports()}
   else{
@@ -178,11 +202,24 @@ $("login-form").addEventListener("submit",async e=>{
   accessToken=data.access_token;
   const rows=await api("/rest/v1/rpc/hh_my_access","POST",{});
   if(epoch!==authEpoch)return;
-  if(!Array.isArray(rows)||!rows.length){const old=accessToken;reset("Cuenta autenticada, pero sin proyecto asignado. Contacta a administración.");try{await api("/auth/v1/logout","POST",undefined,old)}catch{}return}
+  if(!Array.isArray(rows))throw Error("Invalid access result");
   projects=rows;
-  $("signin").hidden=true;$("workspace").hidden=false;renderProjects();message("Sesión autenticada. Permisos consultados en PostgreSQL.");
+  $("signin").hidden=true;$("enrollment").hidden=true;$("workspace").hidden=false;renderProjects();message(rows.length?"Sesión autenticada.":"Cuenta autenticada. Completa o consulta tu solicitud de acceso.");await renderStaff();if(epoch!==authEpoch)return;
   const duration=Math.min(15*60,Math.max(1,Number(data.expires_in)||60));expiryTimer=setTimeout(()=>reset("La sesión de prueba ha expirado. Vuelve a ingresar."),duration*1000);
  }catch(e){if(epoch===authEpoch)reset("No se pudo iniciar sesión o verificar los permisos. Revisa tus credenciales o contacta a administración.")}
 });
+$("show-signup").onclick=()=>{$("enrollment").hidden=false;$("signin").hidden=true;message("");$("signup-email").focus()};
+$("show-login").onclick=()=>{$("enrollment").hidden=true;$("signin").hidden=false;$("signup-password").value="";$("signup-repeat").value="";message("")};
+$("signup-form").addEventListener("submit",async e=>{
+ e.preventDefault();const pass=$("signup-password").value,repeat=$("signup-repeat").value,email=$("signup-email").value.trim(),b=$("signup-submit");
+ if(pass!==repeat||pass.length<12){message("Las contraseñas deben coincidir y tener al menos 12 caracteres.");return}
+ b.disabled=true;
+ try{
+  await api("/auth/v1/signup?redirect_to="+encodeURIComponent("https://humanhub-sandbox.vercel.app/acceso"),"POST",{email,password:pass},null);
+  $("signup-password").value=$("signup-repeat").value="";$("email").value=email;$("enrollment").hidden=true;$("signin").hidden=false;
+  message("Solicitud de cuenta enviada. Si recibes el correo de confirmación, confirma tu dirección e inicia sesión. Si no llega, consulta a administración.");
+ }catch{message("No se pudo completar el registro. La cuenta puede existir o la configuración de correo puede requerir revisión. Contacta a administración.")}finally{b.disabled=false}
+});
+if(location.hash){history.replaceState(null,"",location.pathname+location.search);message("Si confirmaste tu correo, inicia sesión con tu contraseña.")}
 $("logout").addEventListener("click",async()=>{const old=accessToken;reset("Sesión local cerrada.");if(old){try{await api("/auth/v1/logout","POST",undefined,old)}catch{message("Sesión local cerrada. No se pudo confirmar la revocación remota.")}}});
 window.addEventListener("pagehide",()=>{reset("")});
